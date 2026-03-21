@@ -81,6 +81,25 @@
           <div class="row utility-actions">
             <button type="button" id="sync-button" class="ghost subtle" data-i18n="home.refreshSources">Refresh Official Sources</button>
           </div>
+          <div class="admin-access stack">
+            <label>
+              Admin access key
+              <input
+                type="password"
+                id="admin-key"
+                placeholder="Only needed when admin protection is enabled"
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
+            <p class="meta">
+              Used only for review queue and source refresh actions. Stored in this browser tab until you clear it.
+            </p>
+            <div class="row utility-actions">
+              <button type="button" id="save-admin-key" class="ghost subtle">Save key</button>
+              <button type="button" id="clear-admin-key" class="ghost subtle">Clear key</button>
+            </div>
+          </div>
         </form>
         <p id="status" class="status"></p>
       </section>

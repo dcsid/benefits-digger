@@ -10,6 +10,9 @@ const questionShell = document.querySelector("#question-shell");
 const questionEmpty = document.querySelector("#question-empty");
 const categoryList = document.querySelector("#category-list");
 const reviewTasksNode = document.querySelector("#review-tasks");
+const adminKeyInput = document.querySelector("#admin-key");
+const saveAdminKeyButton = document.querySelector("#save-admin-key");
+const clearAdminKeyButton = document.querySelector("#clear-admin-key");
 
 function setStateValidation(message = "") {
   if (!stateValidation || !stateSelect) return;
@@ -157,8 +160,26 @@ function renderReviewTasks(tasks) {
 }
 
 async function loadReviewTasks() {
-  const tasks = await getJson("/api/v1/admin/review-tasks");
-  renderReviewTasks(tasks);
+  try {
+    const tasks = await getJson("/api/v1/admin/review-tasks");
+    renderReviewTasks(tasks);
+  } catch (error) {
+    reviewTasksNode.classList.add("empty");
+    reviewTasksNode.textContent = error.message;
+    throw error;
+  }
+}
+
+function syncAdminKeyInput() {
+  if (!adminKeyInput) return;
+  adminKeyInput.value = getAdminKey();
+}
+
+function saveAdminKeyFromInput() {
+  if (!adminKeyInput) return;
+  setAdminKey(adminKeyInput.value);
+  adminKeyInput.value = getAdminKey();
+  setStatus(getAdminKey() ? "Admin key saved for this browser tab." : "Admin key cleared.");
 }
 
 function resetApp() {
@@ -283,7 +304,9 @@ document.querySelector("#sync-button").addEventListener("click", async () => {
     setStatus("Refreshing official sources...");
     const payload = await getJson("/api/v1/admin/sync", { method: "POST" });
     renderReviewTasks(payload.review_tasks || []);
-    setStatus("Official sources refreshed.");
+    setStatus(
+      `Official sources refreshed. Crawled ${payload.crawled_programs || 0} program sites and added ${payload.crawl_sources_added || 0} direct government page sources.`,
+    );
   } catch (error) {
     setStatus(`Sync failed: ${error.message}`);
   }
@@ -297,10 +320,23 @@ stateSelect.addEventListener("change", () => {
   if (stateSelect.value) setStateValidation("");
 });
 depthSlider.addEventListener("input", updateDepthDescription);
+saveAdminKeyButton?.addEventListener("click", saveAdminKeyFromInput);
+clearAdminKeyButton?.addEventListener("click", () => {
+  if (!adminKeyInput) return;
+  adminKeyInput.value = "";
+  saveAdminKeyFromInput();
+});
+adminKeyInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    saveAdminKeyFromInput();
+  }
+});
 
 document.querySelector("#reset-button").addEventListener("click", resetApp);
 
 renderCategories();
+syncAdminKeyInput();
 loadStates()
   .then(() => loadReviewTasks())
   .catch((error) => setStatus(error.message));

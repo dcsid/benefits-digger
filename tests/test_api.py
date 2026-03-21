@@ -19,6 +19,9 @@ sys.path.insert(0, str(ROOT))
 from app.main import app
 from app.db import SessionLocal
 from app.models import Agency, AmountRule, EligibilityRule, Program, ProgramVersion, Question, Jurisdiction
+from app.catalog import build_fallback_federal_catalog, build_fallback_state_directory
+from app import services as services_module
+from app import gemini as gemini_module
 
 
 def seed_state_program_with_redundant_residency_rule() -> None:
@@ -412,3 +415,68 @@ def test_selected_state_suppresses_redundant_residency_questions_across_depths()
             assert all("resident of california" not in fact.lower() for fact in program["missing_facts"])
             assert all("california residency" not in fact.lower() for fact in program["missing_facts"])
             assert all("currently live in california" not in fact.lower() for fact in program["missing_facts"])
+
+
+def test_sync_remote_sources_enriches_catalog_with_crawled_sources(monkeypatch) -> None:
+    monkeypatch.setattr(services_module, "fetch_remote_federal_catalog", lambda _timeout: build_fallback_federal_catalog())
+    monkeypatch.setattr(services_module, "fetch_remote_state_directory", lambda _timeout: build_fallback_state_directory())
+    monkeypatch.setattr(
+        services_module,
+        "crawl_official_site",
+        lambda *args, **kwargs: [
+            {
+                "url": "https://www.ssa.gov/benefits/retirement/apply.html",
+                "title": "Apply for retirement benefits",
+                "excerpt": "Official application and eligibility information for retirement benefits.",
+                "depth": 0,
+                "discovered_from": None,
+                "content_hash": "crawl-hash-1",
+                "content_type": "text/html",
+                "raw_excerpt": "<html>retirement apply</html>",
+            }
+        ],
+    )
+    monkeypatch.setattr(services_module, "filter_relevant_pages", lambda pages, **kwargs: pages[:1])
+
+    with SessionLocal() as db:
+        summary = services_module.sync_remote_sources(db)
+        assert summary["crawled_programs"] >= 1
+        assert summary["crawl_sources_added"] >= 1
+        crawled_sources = db.scalars(select(services_module.Source).where(services_module.Source.source_type == "crawled_page")).all()
+        assert crawled_sources
+        assert any(source.url == "https://www.ssa.gov/benefits/retirement/apply.html" for source in crawled_sources)
+
+
+def test_ensure_state_programs_uses_crawled_official_pages_in_prompt(monkeypatch) -> None:
+    captured_prompt: dict[str, str] = {}
+    monkeypatch.setattr(gemini_module.settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(gemini_module, "_get_state_seed_url", lambda db, state_code: "https://www.ca.gov/benefits")
+    monkeypatch.setattr(
+        gemini_module,
+        "crawl_official_site",
+        lambda *args, **kwargs: [
+            {
+                "url": "https://www.ca.gov/food-assistance",
+                "title": "California food assistance",
+                "excerpt": "Official state information about food support and nutrition assistance.",
+                "depth": 0,
+                "discovered_from": None,
+                "content_hash": "crawl-hash-ca",
+                "content_type": "text/html",
+                "raw_excerpt": "<html>food assistance</html>",
+            }
+        ],
+    )
+    monkeypatch.setattr(gemini_module, "filter_relevant_pages", lambda pages, **kwargs: pages[:1])
+    monkeypatch.setattr(
+        gemini_module,
+        "_call_gemini",
+        lambda prompt: captured_prompt.update({"value": prompt}) or [],
+    )
+
+    with SessionLocal() as db:
+        created = gemini_module.ensure_state_programs(db, "CA", ["food"])
+        assert created == 0
+
+    assert "https://www.ca.gov/food-assistance" in captured_prompt["value"]
+    assert "Official crawled pages" in captured_prompt["value"]

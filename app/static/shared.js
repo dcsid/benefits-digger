@@ -3,6 +3,7 @@ const state = {
   currentQuestion: null,
   latestPlan: null,
   activeScope: localStorage.getItem("bd_active_scope") || null,
+  adminKey: sessionStorage.getItem("bd_admin_key") || "",
   isScreeningFinished: false,
 };
 
@@ -67,6 +68,17 @@ function setActiveScope(scope) {
   state.activeScope = scope;
   if (scope) localStorage.setItem("bd_active_scope", scope);
   else localStorage.removeItem("bd_active_scope");
+}
+
+function getAdminKey() {
+  return state.adminKey || sessionStorage.getItem("bd_admin_key") || "";
+}
+
+function setAdminKey(key) {
+  const normalized = (key || "").trim();
+  state.adminKey = normalized;
+  if (normalized) sessionStorage.setItem("bd_admin_key", normalized);
+  else sessionStorage.removeItem("bd_admin_key");
 }
 
 const categoryDefinitions = [
@@ -152,13 +164,37 @@ function debounce(fn, ms = 300) {
 }
 
 async function getJson(url, options = {}) {
+  const explicitHeaders = options.headers instanceof Headers
+    ? Object.fromEntries(options.headers.entries())
+    : (options.headers || {});
+  const headers = {
+    "Content-Type": "application/json",
+    ...explicitHeaders,
+  };
+  const adminKey = getAdminKey();
+  if (adminKey && !headers["X-Admin-Key"]) {
+    headers["X-Admin-Key"] = adminKey;
+  }
   const response = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers,
   });
   if (!response.ok) {
-    const payload = await response.text();
-    throw new Error(payload || `Request failed with ${response.status}`);
+    let message = "";
+    try {
+      const payload = await response.json();
+      message = payload?.detail || "";
+    } catch (error) {
+      message = await response.text();
+    }
+    if (response.status === 401 && url.includes("/api/v1/admin/")) {
+      throw new Error(
+        getAdminKey()
+          ? "The saved admin key was rejected. Update it and try again."
+          : "Admin key required. Enter it in the Admin access field to use review and sync actions.",
+      );
+    }
+    throw new Error(message || `Request failed with ${response.status}`);
   }
   return response.json();
 }

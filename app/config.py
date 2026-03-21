@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     max_results_per_section: int = 12
     admin_key: str = ""
     gemini_api_key: str = ""
+    crawl_max_depth: int = 1
+    crawl_max_pages_per_site: int = 8
+    crawl_relevant_page_limit: int = 4
+    crawl_max_programs_per_sync: int = 18
     static_dir: Path = BASE_DIR / "app" / "static"
 
     model_config = SettingsConfigDict(
@@ -30,4 +34,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.catalog import hash_content, slugify
 from app.config import get_settings
+from app.gov_crawl import category_keyword_hints, crawl_official_site, filter_relevant_pages
 from app.models import (
     AmountRule,
     EligibilityRule,
@@ -74,11 +75,26 @@ def _has_state_benefits(db: Session, state_code: str, categories: list[str]) -> 
     return all(cat in existing_cats for cat in categories)
 
 
-def _build_prompt(state_code: str, categories: list[str]) -> str:
+def _build_prompt(state_code: str, categories: list[str], crawled_pages: Optional[list[dict[str, Any]]] = None) -> str:
     state_name = STATE_NAMES.get(state_code, state_code)
     cat_labels = [CATEGORY_LABELS.get(c, c) for c in categories]
     cat_str = ", ".join(cat_labels) if cat_labels else "all available categories"
     valid_categories = ", ".join(f'"{c}"' for c in categories) if categories else '"general"'
+    grounded_pages = crawled_pages or []
+    grounded_section = ""
+    if grounded_pages:
+        grounded_section = f"""
+
+Use ONLY the following crawled official government pages as evidence. Do not invent programs beyond what is grounded in these pages.
+
+Official crawled pages:
+{json.dumps([{"url": page["url"], "title": page["title"], "excerpt": page["excerpt"]} for page in grounded_pages], ensure_ascii=True)}
+
+Additional grounding rules:
+- Every program must clearly correspond to one or more of the crawled pages.
+- apply_url MUST be one of the provided crawled URLs.
+- If the crawled pages are too weak to support a program, omit that program.
+"""
 
     return f"""You are a US government benefits expert. For the state of {state_name} ({state_code}), generate a JSON array of REAL state-level benefit programs in these categories: {cat_str}.
 
@@ -112,6 +128,7 @@ IMPORTANT:
 - Question keys must be unique across all programs (use descriptive names).
 - Do NOT include state residency or "do you live in {state_name}" questions, because the applicant already selected {state_name} in the product.
 - If a program needs county, ZIP code, city, or another sub-state location, ask for that specific detail instead of general residency.
+{grounded_section}
 - Return ONLY the JSON array, no markdown, no explanation."""
 
 
@@ -269,6 +286,24 @@ def _ingest_gemini_programs(db: Session, state_code: str, programs: list[dict[st
     return created
 
 
+def _get_state_seed_url(db: Session, state_code: str) -> Optional[str]:
+    slug = f"state-social-services-{state_code.lower()}"
+    referral = db.scalar(select(Program).where(Program.slug == slug))
+    if referral and referral.apply_url:
+        return referral.apply_url
+
+    jurisdiction = db.scalar(
+        select(Jurisdiction).where(Jurisdiction.code == state_code, Jurisdiction.level == "state")
+    )
+    if jurisdiction is None:
+        return None
+
+    agency = db.scalar(select(Program).where(Program.jurisdiction_id == jurisdiction.id, Program.kind == "referral"))
+    if agency and agency.apply_url:
+        return agency.apply_url
+    return None
+
+
 def ensure_state_programs(db: Session, state_code: str, categories: list[str]) -> int:
     """Ensure state benefit programs exist for the given state and categories.
 
@@ -290,7 +325,25 @@ def ensure_state_programs(db: Session, state_code: str, categories: list[str]) -
 
     logger.info("Generating state benefits for %s via Gemini...", state_code)
     try:
-        prompt = _build_prompt(state_code, categories)
+        crawled_pages: list[dict[str, Any]] = []
+        seed_url = _get_state_seed_url(db, state_code)
+        if seed_url:
+            crawled_pages = crawl_official_site(
+                seed_url,
+                timeout_seconds=settings.request_timeout_seconds,
+                max_pages=settings.crawl_max_pages_per_site,
+                max_depth=settings.crawl_max_depth,
+                keyword_hints=category_keyword_hints(categories),
+            )
+            crawled_pages = filter_relevant_pages(
+                crawled_pages,
+                context_title=f"{STATE_NAMES.get(state_code, state_code)} benefits",
+                jurisdiction_name=STATE_NAMES.get(state_code, state_code),
+                categories=categories,
+                max_results=settings.crawl_relevant_page_limit,
+            )
+
+        prompt = _build_prompt(state_code, categories, crawled_pages=crawled_pages)
         programs = _call_gemini(prompt)
         created = _ingest_gemini_programs(db, state_code, programs)
         db.commit()

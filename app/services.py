@@ -19,6 +19,7 @@ from app.catalog import (
     slugify,
 )
 from app.config import get_settings
+from app.gov_crawl import category_keyword_hints, crawl_official_site, filter_relevant_pages
 from app.models import (
     Agency,
     AmountRule,
@@ -283,7 +284,13 @@ def bootstrap_catalog(db: Session, use_remote: bool = True) -> None:
 
 
 def sync_remote_sources(db: Session) -> dict[str, Any]:
-    summary = {"federal": "skipped", "states": "skipped", "review_tasks_created": 0}
+    summary = {
+        "federal": "skipped",
+        "states": "skipped",
+        "review_tasks_created": 0,
+        "crawled_programs": 0,
+        "crawl_sources_added": 0,
+    }
     federal_catalog = fetch_remote_federal_catalog(settings.request_timeout_seconds)
     state_catalog = fetch_remote_state_directory(settings.request_timeout_seconds)
     try:
@@ -291,6 +298,10 @@ def sync_remote_sources(db: Session) -> dict[str, Any]:
         summary["federal"] = "synced"
         summary["review_tasks_created"] += sync_state_directory(db, state_catalog, source_mode="remote")
         summary["states"] = "synced"
+        crawl_summary = enrich_catalog_with_crawled_sources(db)
+        summary["crawled_programs"] = crawl_summary["crawled_programs"]
+        summary["crawl_sources_added"] = crawl_summary["crawl_sources_added"]
+        summary["review_tasks_created"] += crawl_summary["review_tasks_created"]
         db.commit()
     except Exception:
         db.rollback()
@@ -568,6 +579,80 @@ def sync_state_directory(db: Session, catalog: dict[str, Any], source_mode: str)
 
     db.flush()
     return review_tasks_created
+
+
+def enrich_catalog_with_crawled_sources(db: Session) -> dict[str, int]:
+    programs = db.scalars(
+        select(Program)
+        .where(Program.status == "active")
+        .order_by(Program.updated_at.desc(), Program.name.asc())
+    ).all()
+    programs = [program for program in programs if is_official_government_url(program.apply_url)]
+    programs.sort(
+        key=lambda program: (
+            any(source.source_type == "crawled_page" for source in program.sources),
+            program.name.lower(),
+        )
+    )
+
+    summary = {"crawled_programs": 0, "crawl_sources_added": 0, "review_tasks_created": 0}
+    for program in programs[: settings.crawl_max_programs_per_sync]:
+        pages = crawl_official_site(
+            program.apply_url,
+            timeout_seconds=settings.request_timeout_seconds,
+            max_pages=settings.crawl_max_pages_per_site,
+            max_depth=settings.crawl_max_depth,
+            keyword_hints=category_keyword_hints([program.category, program.family or "general"]),
+        )
+        if not pages:
+            continue
+
+        summary["crawled_programs"] += 1
+        relevant_pages = filter_relevant_pages(
+            pages,
+            context_title=program.name,
+            jurisdiction_name=program.jurisdiction.name,
+            categories=[program.category],
+            max_results=settings.crawl_relevant_page_limit,
+        )
+        for page in relevant_pages:
+            source_key = f"crawl:{program.slug}:{hash_content(page['url'])[:12]}"
+            existing_source = db.scalar(select(Source).where(Source.key == source_key))
+            source = upsert_source(
+                db,
+                key=source_key,
+                title=page["title"],
+                url=page["url"],
+                source_type="crawled_page",
+                authority_rank=78,
+                parser_type="html_crawl",
+                fetch_cadence="weekly",
+                program_id=program.id,
+                jurisdiction_id=program.jurisdiction_id,
+            )
+            if existing_source is None:
+                summary["crawl_sources_added"] += 1
+
+            snapshot, changed, previous_snapshot = create_snapshot(
+                db,
+                source=source,
+                content_hash=page["content_hash"],
+                content_type=page["content_type"],
+                raw_excerpt=page["raw_excerpt"],
+            )
+            if changed and previous_snapshot is not None:
+                summary["review_tasks_created"] += create_review_task(
+                    db,
+                    source=source,
+                    previous_snapshot=previous_snapshot,
+                    current_snapshot=snapshot,
+                    diff_type="content",
+                    materiality_score=45,
+                    notes=f"Crawled official page changed for {program.name}.",
+                )
+
+    db.flush()
+    return summary
 
 
 def create_session(
