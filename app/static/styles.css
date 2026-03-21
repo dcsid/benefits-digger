@@ -179,6 +179,10 @@ fieldset {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.planner-grid {
+  align-items: start;
+}
+
 .result-list,
 .review-list {
   display: grid;
@@ -186,11 +190,30 @@ fieldset {
 }
 
 .card,
-.task {
+.task,
+.mini-card,
+.metric-card {
   border: 1px solid var(--line);
   border-radius: 18px;
   background: white;
   padding: 1rem;
+}
+
+.metric-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.metric-card strong {
+  display: block;
+  font-size: 1.65rem;
+  margin-top: 0.3rem;
+}
+
+.metric-card span {
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .card header {
@@ -247,13 +270,38 @@ fieldset {
   padding-left: 1rem;
 }
 
+.mini-card h4,
+.mini-card h5 {
+  margin: 0 0 0.45rem;
+}
+
+.scenario-button {
+  justify-content: flex-start;
+  text-align: left;
+  border-radius: 18px;
+  padding: 1rem;
+  background: white;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.scenario-button strong {
+  display: block;
+}
+
+.explorer-item a,
+.mini-card a {
+  word-break: break-word;
+}
+
 a {
   color: var(--accent);
 }
 
 @media (max-width: 860px) {
   .layout,
-  .results-grid {
+  .results-grid,
+  .metric-grid {
     grid-template-columns: 1fr;
   }
 }

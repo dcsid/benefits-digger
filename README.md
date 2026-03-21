@@ -10,6 +10,9 @@ It includes:
 - a browser UI for session creation, adaptive questions, and result review
 - a remote sync endpoint that pulls the official USA.gov benefit feed and state directory
 - official-government links only in the displayed sources and application paths
+- a planning dashboard with benefit-stack and top-next-step summaries
+- a what-if scenario comparison tool
+- a searchable official program explorer
 
 ## What It Does Today
 
@@ -19,6 +22,8 @@ It includes:
 - Uses explainable confidence factors instead of a single arbitrary confidence guess.
 - Creates review tasks when the official source snapshots change.
 - Shows where the data was gathered from and how to get the benefit using official government pages only.
+- Lets a user compare scenario changes without overwriting the original session.
+- Exposes a planning layer that turns matches into next actions, source hubs, and missing-fact priorities.
 
 ## Current Scope
 
@@ -42,9 +47,12 @@ Open [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 - `GET /health`
 - `GET /api/v1/jurisdictions/states`
+- `GET /api/v1/programs`
 - `POST /api/v1/sessions`
 - `POST /api/v1/sessions/{session_id}/answers`
 - `GET /api/v1/sessions/{session_id}/results`
+- `GET /api/v1/sessions/{session_id}/plan`
+- `POST /api/v1/sessions/{session_id}/compare`
 - `GET /api/v1/programs/{slug}`
 - `GET /api/v1/admin/review-tasks`
 - `POST /api/v1/admin/sync`

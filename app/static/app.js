@@ -1,6 +1,7 @@
 const state = {
   sessionId: null,
   currentQuestion: null,
+  latestPlan: null,
 };
 
 const categoryDefinitions = [
@@ -25,6 +26,33 @@ const depthDescriptions = {
   deep:
     "Deep is more aggressive: it keeps going longer and starts medium and high-sensitivity follow-ups much earlier to tighten the match.",
 };
+const scenarioPresets = [
+  {
+    name: "If I had limited income and resources",
+    description: "Useful for cash-assistance or SSI-style planning.",
+    answers: { applicant_income: "Yes" },
+  },
+  {
+    name: "If I had a qualifying disability",
+    description: "Tests disability-related pathways and work-limitation rules.",
+    answers: { applicant_disability: "Yes", applicant_ability_to_work: "Yes" },
+  },
+  {
+    name: "If I had active-duty military service",
+    description: "Checks whether service history opens veteran benefits.",
+    answers: { applicant_served_in_active_military: "Yes", applicant_service_disability: "Yes" },
+  },
+  {
+    name: "If I had a recent family death event",
+    description: "Explores survivor and funeral assistance pathways.",
+    answers: {
+      applicant_dolo: "Yes",
+      deceased_died_of_COVID: "Yes",
+      deceased_death_location_is_US: "Yes",
+      deceased_date_of_death: "2021-01-15",
+    },
+  },
+];
 
 const scopeSelect = document.querySelector("#scope");
 const stateSelect = document.querySelector("#state-code");
@@ -40,6 +68,20 @@ const stateResults = document.querySelector("#state-results");
 const statusNode = document.querySelector("#status");
 const reviewTasks = document.querySelector("#review-tasks");
 const categoryList = document.querySelector("#category-list");
+const planShell = document.querySelector("#plan-shell");
+const planEmpty = document.querySelector("#plan-empty");
+const planDepthPill = document.querySelector("#plan-depth-pill");
+const overviewMetrics = document.querySelector("#overview-metrics");
+const benefitStack = document.querySelector("#benefit-stack");
+const missingFacts = document.querySelector("#missing-facts");
+const actionPlan = document.querySelector("#action-plan");
+const sourceHub = document.querySelector("#source-hub");
+const planningNotes = document.querySelector("#planning-notes");
+const scenarioPresetsNode = document.querySelector("#scenario-presets");
+const scenarioResults = document.querySelector("#scenario-results");
+const explorerForm = document.querySelector("#explorer-form");
+const explorerQuery = document.querySelector("#explorer-query");
+const explorerResults = document.querySelector("#explorer-results");
 
 async function getJson(url, options = {}) {
   const response = await fetch(url, {
@@ -99,6 +141,19 @@ function setAllCategories(checked) {
   document.querySelectorAll('input[name="category"]').forEach((input) => {
     input.checked = checked;
   });
+}
+
+function renderScenarioPresets() {
+  scenarioPresetsNode.innerHTML = scenarioPresets
+    .map(
+      (preset, index) => `
+        <button type="button" class="scenario-button" data-scenario-index="${index}">
+          <strong>${preset.name}</strong>
+          <span class="meta">${preset.description}</span>
+        </button>
+      `,
+    )
+    .join("");
 }
 
 function renderQuestion(question) {
@@ -252,6 +307,189 @@ function renderResults(payload) {
     : "No state results for the current answers.";
 }
 
+function renderPlan(plan) {
+  state.latestPlan = plan;
+  if (!plan) {
+    planShell.classList.add("hidden");
+    planEmpty.classList.remove("hidden");
+    planDepthPill.textContent = "No active session";
+    return;
+  }
+
+  planShell.classList.remove("hidden");
+  planEmpty.classList.add("hidden");
+  planDepthPill.textContent = `${plan.profile.depth_mode} depth`;
+
+  const metrics = [
+    { label: "Likely programs", value: plan.overview.likely_programs },
+    { label: "Possible programs", value: plan.overview.possible_programs },
+    { label: "Answered questions", value: plan.overview.answered_questions },
+    { label: "Average rule coverage", value: `${plan.overview.average_rule_coverage}%` },
+  ];
+
+  overviewMetrics.innerHTML = metrics
+    .map(
+      (metric) => `
+        <article class="metric-card">
+          <span>${metric.label}</span>
+          <strong>${metric.value}</strong>
+        </article>
+      `,
+    )
+    .join("");
+
+  benefitStack.innerHTML = plan.benefit_stack.length
+    ? plan.benefit_stack
+        .map(
+          (item) => `
+            <article class="mini-card">
+              <h4>${item.label}</h4>
+              <p class="meta">${item.likely_programs} likely · ${item.possible_programs} possible</p>
+              <p>${item.top_programs.join(", ") || "No top programs yet."}</p>
+            </article>
+          `,
+        )
+        .join("")
+    : "<p class='meta'>No benefit stack yet.</p>";
+
+  missingFacts.innerHTML = plan.top_missing_facts.length
+    ? plan.top_missing_facts
+        .map(
+          (item) => `
+            <article class="mini-card">
+              <h4>${item.label}</h4>
+              <p class="meta">Affects ${item.program_count} program match${item.program_count === 1 ? "" : "es"}.</p>
+            </article>
+          `,
+        )
+        .join("")
+    : "<p class='meta'>No missing-fact hotspots right now.</p>";
+
+  actionPlan.innerHTML = plan.action_plan.length
+    ? plan.action_plan
+        .map(
+          (step) => `
+            <article class="mini-card">
+              <h4>${step.program_name}</h4>
+              <p class="meta">${statusLabel(step.eligibility_status)} · confidence ${step.confidence}/100</p>
+              <p><a href="${step.url}" target="_blank" rel="noreferrer">${step.step_label}</a></p>
+            </article>
+          `,
+        )
+        .join("")
+    : "<p class='meta'>No action steps yet.</p>";
+
+  sourceHub.innerHTML = plan.official_source_hub.length
+    ? plan.official_source_hub
+        .map(
+          (item) => `
+            <article class="mini-card">
+              <a href="${item.url}" target="_blank" rel="noreferrer">${item.label}</a>
+            </article>
+          `,
+        )
+        .join("")
+    : "<p class='meta'>No official source hub yet.</p>";
+
+  planningNotes.innerHTML = plan.planning_notes.length
+    ? plan.planning_notes
+        .map((note) => `<article class="mini-card"><p>${note}</p></article>`)
+        .join("")
+    : "<p class='meta'>Planning notes will appear after your session has results.</p>";
+}
+
+function renderScenarioComparison(payload) {
+  if (!payload.comparisons.length) {
+    scenarioResults.classList.add("empty");
+    scenarioResults.textContent = "No scenario result returned.";
+    return;
+  }
+  scenarioResults.classList.remove("empty");
+  scenarioResults.innerHTML = payload.comparisons
+    .map(
+      (comparison) => `
+        <article class="card">
+          <header>
+            <div>
+              <h3>${comparison.name}</h3>
+              <p class="meta">${comparison.description || "Scenario comparison"}</p>
+            </div>
+          </header>
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span>Likely delta</span>
+              <strong>${comparison.summary.likely_delta > 0 ? "+" : ""}${comparison.summary.likely_delta}</strong>
+            </article>
+            <article class="metric-card">
+              <span>Possible delta</span>
+              <strong>${comparison.summary.possible_delta > 0 ? "+" : ""}${comparison.summary.possible_delta}</strong>
+            </article>
+            <article class="metric-card">
+              <span>Federal delta</span>
+              <strong>${comparison.summary.federal_delta > 0 ? "+" : ""}${comparison.summary.federal_delta}</strong>
+            </article>
+            <article class="metric-card">
+              <span>State delta</span>
+              <strong>${comparison.summary.state_delta > 0 ? "+" : ""}${comparison.summary.state_delta}</strong>
+            </article>
+          </div>
+          <div class="results-grid planner-grid">
+            <div>
+              <h4>New or unlocked programs</h4>
+              ${
+                comparison.gained_programs.length
+                  ? `<ul class="reason-list">${comparison.gained_programs
+                      .map((item) => `<li>${item.program_name} · ${statusLabel(item.after_status)}</li>`)
+                      .join("")}</ul>`
+                  : "<p class='meta'>No new positive matches in this scenario.</p>"
+              }
+            </div>
+            <div>
+              <h4>Improved programs</h4>
+              ${
+                comparison.improved_programs.length
+                  ? `<ul class="reason-list">${comparison.improved_programs
+                      .map((item) => `<li>${item.program_name} · ${statusLabel(item.before_status)} to ${statusLabel(item.after_status)}</li>`)
+                      .join("")}</ul>`
+                  : "<p class='meta'>No status improvements in this scenario.</p>"
+              }
+            </div>
+          </div>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderExplorer(programs) {
+  explorerResults.classList.remove("empty");
+  explorerResults.innerHTML = programs.length
+    ? programs
+        .map(
+          (program) => `
+            <article class="mini-card explorer-item">
+              <h4>${program.name}</h4>
+              <p class="meta">${program.agency || "Unknown agency"} · ${program.jurisdiction.name}</p>
+              <p>${program.summary || "No summary available."}</p>
+              ${
+                program.apply_url
+                  ? `<p><a href="${program.apply_url}" target="_blank" rel="noreferrer">Open official government page</a></p>`
+                  : ""
+              }
+              ${
+                program.data_gathered_from.length
+                  ? `<ul class="source-list">${program.data_gathered_from
+                      .map((source) => `<li><a href="${source.url}" target="_blank" rel="noreferrer">${source.title}</a></li>`)
+                      .join("")}</ul>`
+                  : ""
+              }
+            </article>
+          `,
+        )
+        .join("")
+    : "No programs matched this search.";
+}
+
 function renderReviewTasks(tasks) {
   reviewTasks.classList.remove("empty");
   reviewTasks.innerHTML = tasks.length
@@ -278,9 +516,44 @@ async function loadResults() {
   renderResults(payload);
 }
 
+async function loadPlan() {
+  if (!state.sessionId) {
+    renderPlan(null);
+    return;
+  }
+  const payload = await getJson(`/api/v1/sessions/${state.sessionId}/plan`);
+  renderPlan(payload);
+}
+
 async function loadReviewTasks() {
   const tasks = await getJson("/api/v1/admin/review-tasks");
   renderReviewTasks(tasks);
+}
+
+async function loadExplorer() {
+  const categories = selectedCategories();
+  const params = new URLSearchParams({
+    query: explorerQuery.value.trim(),
+    scope: scopeSelect.value,
+    limit: "20",
+  });
+  if (stateSelect.value) params.set("state_code", stateSelect.value);
+  if (categories.length) params.set("categories", categories.join(","));
+  const payload = await getJson(`/api/v1/programs?${params.toString()}`);
+  renderExplorer(payload);
+}
+
+async function runScenario(index) {
+  if (!state.sessionId) {
+    setStatus("Start a session before running scenarios.");
+    return;
+  }
+  const preset = scenarioPresets[index];
+  const payload = await getJson(`/api/v1/sessions/${state.sessionId}/compare`, {
+    method: "POST",
+    body: JSON.stringify({ scenarios: [preset] }),
+  });
+  renderScenarioComparison(payload);
 }
 
 startForm.addEventListener("submit", async (event) => {
@@ -305,6 +578,8 @@ startForm.addEventListener("submit", async (event) => {
     state.sessionId = session.session_id;
     renderQuestion(session.next_question);
     await loadResults();
+    await loadPlan();
+    await loadExplorer();
     setStatus(`Session ${state.sessionId} is live.`);
   } catch (error) {
     setStatus(`Could not start session: ${error.message}`);
@@ -331,6 +606,7 @@ questionForm.addEventListener("submit", async (event) => {
     });
     renderQuestion(payload.next_question);
     await loadResults();
+    await loadPlan();
     setStatus(`Saved answer for ${state.currentQuestion.key}.`);
   } catch (error) {
     setStatus(`Could not save answer: ${error.message}`);
@@ -340,6 +616,7 @@ questionForm.addEventListener("submit", async (event) => {
 document.querySelector("#show-results").addEventListener("click", async () => {
   try {
     await loadResults();
+    await loadPlan();
     setStatus("Results refreshed.");
   } catch (error) {
     setStatus(`Could not refresh results: ${error.message}`);
@@ -352,6 +629,8 @@ document.querySelector("#sync-button").addEventListener("click", async () => {
     const payload = await getJson("/api/v1/admin/sync", { method: "POST" });
     renderReviewTasks(payload.review_tasks || []);
     await loadResults();
+    await loadPlan();
+    await loadExplorer();
     setStatus("Official sources refreshed.");
   } catch (error) {
     setStatus(`Sync failed: ${error.message}`);
@@ -359,12 +638,38 @@ document.querySelector("#sync-button").addEventListener("click", async () => {
 });
 
 document.querySelector("#refresh-review").addEventListener("click", loadReviewTasks);
+document.querySelector("#refresh-explorer").addEventListener("click", loadExplorer);
 document.querySelector("#select-all-categories").addEventListener("click", () => setAllCategories(true));
 document.querySelector("#clear-categories").addEventListener("click", () => setAllCategories(false));
 scopeSelect.addEventListener("change", updateStateVisibility);
 depthSelect.addEventListener("change", updateDepthDescription);
+explorerForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await loadExplorer();
+  } catch (error) {
+    setStatus(`Explorer failed: ${error.message}`);
+  }
+});
+scenarioPresetsNode.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-scenario-index]");
+  if (!button) return;
+  try {
+    await runScenario(button.dataset.scenarioIndex);
+    setStatus("Scenario comparison updated.");
+  } catch (error) {
+    setStatus(`Scenario compare failed: ${error.message}`);
+  }
+});
 
 renderCategories();
-loadStates().then(loadReviewTasks).catch((error) => setStatus(error.message));
+renderScenarioPresets();
+loadStates()
+  .then(async () => {
+    await loadReviewTasks();
+    await loadExplorer();
+  })
+  .catch((error) => setStatus(error.message));
 updateStateVisibility();
 updateDepthDescription();
+renderPlan(null);

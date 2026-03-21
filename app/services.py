@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Optional, Tuple
 
 from sqlalchemy import desc, func, select
@@ -77,6 +77,20 @@ CATEGORY_FILTER_MAP = {
     "veteran": {"veteran", "va_disability"},
     "cash": {"cash", "ssi"},
     "all": set(),
+}
+CATEGORY_LABELS = {
+    "children_families": "Children and families",
+    "death": "Death",
+    "disabilities": "Disabilities",
+    "disasters": "Disasters",
+    "education": "Education",
+    "food": "Food",
+    "health": "Health",
+    "housing_utilities": "Housing and utilities",
+    "jobs_unemployment": "Jobs and unemployment",
+    "military_veterans": "Military and veterans",
+    "retirement_seniors": "Retirement and seniors",
+    "welfare_cash_assistance": "Welfare and cash assistance",
 }
 
 
@@ -435,6 +449,10 @@ def get_next_question(db: Session, session: ScreeningSession, answers: dict[str,
 
 def compute_results(db: Session, session: ScreeningSession) -> dict[str, Any]:
     answers = get_answers_map(db, session)
+    return compute_results_for_answers(db, session, answers)
+
+
+def compute_results_for_answers(db: Session, session: ScreeningSession, answers: dict[str, Any]) -> dict[str, Any]:
     federal_results = []
     state_results = []
     for program in get_candidate_programs(db, session):
@@ -463,6 +481,51 @@ def provisional_result_count(db: Session, session: ScreeningSession) -> int:
     for bucket in ("federal_results", "state_results"):
         count += sum(1 for item in results[bucket] if item["eligibility_status"] != "likely_ineligible")
     return count
+
+
+def compute_plan(db: Session, session: ScreeningSession) -> dict[str, Any]:
+    answers = get_answers_map(db, session)
+    results = compute_results_for_answers(db, session, answers)
+    all_results = results["federal_results"] + results["state_results"]
+    likely = [item for item in all_results if item["eligibility_status"] == "likely_eligible"]
+    possible = [item for item in all_results if item["eligibility_status"] == "possibly_eligible"]
+    positive_results = [item for item in all_results if item["eligibility_status"] != "likely_ineligible"]
+
+    top_missing_facts = rank_missing_facts(positive_results)
+    action_plan = build_action_plan(positive_results)
+    official_source_hub = dedupe_link_payload(
+        link
+        for result in positive_results
+        for link in (
+            [{"label": source["title"], "url": source["url"]} for source in result["data_gathered_from"]]
+            + result["how_to_get_benefit"]
+        )
+    )
+
+    likely_federal = sum(1 for item in results["federal_results"] if item["eligibility_status"] == "likely_eligible")
+    likely_state = sum(1 for item in results["state_results"] if item["eligibility_status"] == "likely_eligible")
+    average_coverage = round(
+        sum(item["certainty_breakdown"]["rule_coverage"] for item in positive_results) / len(positive_results)
+    ) if positive_results else 0
+    next_question = get_next_question(db, session, answers)
+
+    return {
+        "profile": build_profile_summary(session, answers),
+        "overview": {
+            "likely_programs": len(likely),
+            "possible_programs": len(possible),
+            "likely_federal_programs": likely_federal,
+            "likely_state_programs": likely_state,
+            "average_rule_coverage": average_coverage,
+            "answered_questions": len(answers),
+            "next_question_key": next_question.key if next_question else None,
+        },
+        "benefit_stack": build_benefit_stack(positive_results),
+        "top_missing_facts": top_missing_facts,
+        "action_plan": action_plan,
+        "official_source_hub": official_source_hub[:10],
+        "planning_notes": build_planning_notes(session, likely, possible, top_missing_facts),
+    }
 
 
 def get_program_detail(db: Session, slug: str) -> Optional[dict[str, Any]]:
@@ -531,6 +594,103 @@ def list_review_tasks(db: Session) -> list[dict[str, Any]]:
     return payload
 
 
+def compare_scenarios(
+    db: Session,
+    session: ScreeningSession,
+    scenarios: list[dict[str, Any]],
+) -> dict[str, Any]:
+    base_answers = get_answers_map(db, session)
+    baseline = compute_results_for_answers(db, session, base_answers)
+    baseline_index = index_results(baseline)
+
+    comparisons = []
+    for scenario in scenarios:
+        scenario_answers = dict(base_answers)
+        scenario_answers.update(scenario.get("answers", {}))
+        scenario_results = compute_results_for_answers(db, session, scenario_answers)
+        scenario_index = index_results(scenario_results)
+        comparisons.append(
+            {
+                "name": scenario.get("name", "Scenario"),
+                "description": scenario.get("description"),
+                "answer_overrides": scenario.get("answers", {}),
+                "summary": summarize_comparison(baseline_index, scenario_index),
+                "gained_programs": list_changed_programs(baseline_index, scenario_index, direction="gain"),
+                "improved_programs": list_changed_programs(baseline_index, scenario_index, direction="improve"),
+                "lost_programs": list_changed_programs(baseline_index, scenario_index, direction="loss"),
+            }
+        )
+
+    return {
+        "session_id": session.public_id,
+        "baseline": {
+            "overview": build_comparison_overview(baseline),
+        },
+        "comparisons": comparisons,
+    }
+
+
+def list_program_catalog(
+    db: Session,
+    *,
+    query: str = "",
+    scope: str = "both",
+    state_code: Optional[str] = None,
+    categories: Optional[list[str]] = None,
+    limit: int = 40,
+) -> list[dict[str, Any]]:
+    programs = db.scalars(select(Program).where(Program.status == "active").order_by(Program.name.asc())).all()
+    filtered: list[Program] = []
+    query_lower = query.lower().strip()
+    expanded_categories = expand_category_filters(set(categories or []))
+
+    for program in programs:
+        if scope == "federal" and program.jurisdiction.level != "federal":
+            continue
+        if scope == "state" and program.jurisdiction.level != "state":
+            continue
+        if state_code and program.jurisdiction.level == "state" and program.jurisdiction.code != state_code.upper():
+            continue
+        if expanded_categories and program.kind != "referral" and not program_matches_categories(program, expanded_categories):
+            continue
+        if query_lower:
+            haystack = " ".join(
+                [
+                    program.name.lower(),
+                    (program.summary or "").lower(),
+                    (program.category or "").lower(),
+                    (program.family or "").lower(),
+                    (program.agency.name.lower() if program.agency else ""),
+                ]
+            )
+            if query_lower not in haystack:
+                continue
+        filtered.append(program)
+
+    payload = []
+    for program in filtered[:limit]:
+        sources = get_program_sources(db, program)
+        payload.append(
+            {
+                "slug": program.slug,
+                "name": program.name,
+                "kind": program.kind,
+                "category": program.category,
+                "family": program.family,
+                "summary": program.summary,
+                "jurisdiction": {
+                    "code": program.jurisdiction.code,
+                    "level": program.jurisdiction.level,
+                    "name": program.jurisdiction.name,
+                },
+                "agency": program.agency.name if program.agency else None,
+                "apply_url": get_official_application_url(program, sources),
+                "data_gathered_from": sources[:3],
+            }
+        )
+    return payload
+
+
 def evaluate_program(db: Session, program: Program, version: ProgramVersion, answers: dict[str, Any]) -> dict[str, Any]:
     rules = db.scalars(
         select(EligibilityRule)
@@ -588,6 +748,8 @@ def evaluate_program(db: Session, program: Program, version: ProgramVersion, ans
         "program_slug": program.slug,
         "program_name": program.name,
         "kind": program.kind,
+        "category": program.category,
+        "family": program.family,
         "eligibility_status": eligibility_status,
         "decision_certainty": decision_certainty,
         "certainty_breakdown": {
@@ -646,6 +808,16 @@ def result_sort_key(result: dict[str, Any]) -> tuple[int, int]:
         "likely_ineligible": 0,
     }
     return status_rank.get(result["eligibility_status"], 0), result["decision_certainty"]
+
+
+def status_rank(status: str) -> int:
+    ranking = {
+        "likely_eligible": 3,
+        "possibly_eligible": 2,
+        "unclear": 1,
+        "likely_ineligible": 0,
+    }
+    return ranking.get(status, 0)
 
 
 def get_depth_policy(depth_mode: str) -> dict[str, Any]:
@@ -857,6 +1029,242 @@ def get_program_sources(db: Session, program: Program) -> list[dict[str, Any]]:
                 }
             )
     return payload
+
+
+def build_profile_summary(session: ScreeningSession, answers: dict[str, Any]) -> dict[str, Any]:
+    birth_date = parse_answer_date(answers.get("applicant_date_of_birth"))
+    age_years = compute_age_years(birth_date) if birth_date else None
+    return {
+        "scope": session.scope,
+        "state_code": session.state_code,
+        "depth_mode": session.depth_mode,
+        "selected_categories": [
+            {"key": category, "label": CATEGORY_LABELS.get(category, category.replace("_", " ").title())}
+            for category in session.categories_json or []
+        ],
+        "derived_facts": {
+            "age_years": age_years,
+            "is_retirement_age": bool(age_years is not None and age_years >= 62),
+            "has_income_constraint": normalize_boolish(answers.get("applicant_income")) == "yes",
+            "has_disability": normalize_boolish(answers.get("applicant_disability")) == "yes",
+            "has_military_service": normalize_boolish(answers.get("applicant_served_in_active_military")) == "yes",
+            "reported_family_death": normalize_boolish(answers.get("applicant_dolo")) == "yes",
+        },
+    }
+
+
+def build_benefit_stack(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    buckets: dict[str, dict[str, Any]] = {}
+    for item in results:
+        category = item.get("category") or infer_result_category(item)
+        bucket = buckets.setdefault(
+            category,
+            {
+                "category": category,
+                "label": CATEGORY_LABELS.get(category, category.replace("_", " ").title()),
+                "likely_programs": 0,
+                "possible_programs": 0,
+                "top_programs": [],
+            },
+        )
+        if item["eligibility_status"] == "likely_eligible":
+            bucket["likely_programs"] += 1
+        elif item["eligibility_status"] == "possibly_eligible":
+            bucket["possible_programs"] += 1
+        if len(bucket["top_programs"]) < 3:
+            bucket["top_programs"].append(item["program_name"])
+
+    return sorted(
+        buckets.values(),
+        key=lambda item: (item["likely_programs"], item["possible_programs"], len(item["top_programs"])),
+        reverse=True,
+    )
+
+
+def build_action_plan(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    plan: list[dict[str, Any]] = []
+    ordered_results = sorted(results, key=result_sort_key, reverse=True)
+    for result in ordered_results[:6]:
+        if not result["how_to_get_benefit"]:
+            continue
+        primary_step = result["how_to_get_benefit"][0]
+        plan.append(
+            {
+                "program_name": result["program_name"],
+                "eligibility_status": result["eligibility_status"],
+                "confidence": result["decision_certainty"],
+                "step_label": primary_step["label"],
+                "url": primary_step["url"],
+                "jurisdiction": result["jurisdiction"]["name"],
+            }
+        )
+    return plan
+
+
+def build_planning_notes(
+    session: ScreeningSession,
+    likely: list[dict[str, Any]],
+    possible: list[dict[str, Any]],
+    top_missing_facts: list[dict[str, Any]],
+) -> list[str]:
+    notes: list[str] = []
+    if likely:
+        notes.append(
+            f"You already have {len(likely)} strong match{'es' if len(likely) != 1 else ''} to pursue on official government sites."
+        )
+    if possible and not likely:
+        notes.append(
+            f"You have {len(possible)} possible match{'es' if len(possible) != 1 else ''}; answering a few more questions should tighten these."
+        )
+    if top_missing_facts:
+        notes.append(f"The biggest information gap right now is: {top_missing_facts[0]['label']}.")
+    if session.scope in {"state", "both"} and not session.state_code:
+        notes.append("Choose a state to unlock official state benefit pathways.")
+    return notes
+
+
+def rank_missing_facts(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    counts: dict[str, int] = {}
+    for result in results:
+        for fact in result["missing_facts"]:
+            counts[fact] = counts.get(fact, 0) + 1
+    ranked = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    return [{"label": label, "program_count": count} for label, count in ranked[:8]]
+
+
+def dedupe_link_payload(links) -> list[dict[str, str]]:
+    seen: set[str] = set()
+    payload: list[dict[str, str]] = []
+    for link in links:
+        url = link.get("url")
+        if not url or url in seen:
+            continue
+        payload.append({"label": link.get("label") or url, "url": url})
+        seen.add(url)
+    return payload
+
+
+def parse_answer_date(value: Any) -> Optional[date]:
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def compute_age_years(birth_date: date) -> int:
+    today = date.today()
+    return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+
+
+def normalize_boolish(value: Any) -> str:
+    if value is None:
+        return ""
+    normalized = str(value).strip().lower()
+    if normalized in {"yes", "true", "1"}:
+        return "yes"
+    if normalized in {"no", "false", "0"}:
+        return "no"
+    return normalized
+
+
+def infer_result_category(result: dict[str, Any]) -> str:
+    haystack = " ".join(
+        [
+            result.get("program_name", "").lower(),
+            result.get("summary", "").lower(),
+        ]
+    )
+    if "veteran" in haystack or "military" in haystack:
+        return "military_veterans"
+    if "retirement" in haystack or "social security" in haystack:
+        return "retirement_seniors"
+    if "disability" in haystack:
+        return "disabilities"
+    if "death" in haystack or "funeral" in haystack or "survivor" in haystack:
+        return "death"
+    return "welfare_cash_assistance"
+
+
+def index_results(results: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {
+        item["program_slug"]: item
+        for item in results["federal_results"] + results["state_results"]
+    }
+
+
+def build_comparison_overview(results: dict[str, Any]) -> dict[str, int]:
+    all_results = results["federal_results"] + results["state_results"]
+    return {
+        "likely_programs": sum(1 for item in all_results if item["eligibility_status"] == "likely_eligible"),
+        "possible_programs": sum(1 for item in all_results if item["eligibility_status"] == "possibly_eligible"),
+        "state_programs": len(results["state_results"]),
+        "federal_programs": len(results["federal_results"]),
+    }
+
+
+def summarize_comparison(
+    baseline_index: dict[str, dict[str, Any]],
+    scenario_index: dict[str, dict[str, Any]],
+) -> dict[str, int]:
+    baseline_overview = build_comparison_overview(
+        {
+            "federal_results": [item for item in baseline_index.values() if item["jurisdiction"]["level"] == "federal"],
+            "state_results": [item for item in baseline_index.values() if item["jurisdiction"]["level"] == "state"],
+        }
+    )
+    scenario_overview = build_comparison_overview(
+        {
+            "federal_results": [item for item in scenario_index.values() if item["jurisdiction"]["level"] == "federal"],
+            "state_results": [item for item in scenario_index.values() if item["jurisdiction"]["level"] == "state"],
+        }
+    )
+    return {
+        "likely_delta": scenario_overview["likely_programs"] - baseline_overview["likely_programs"],
+        "possible_delta": scenario_overview["possible_programs"] - baseline_overview["possible_programs"],
+        "federal_delta": scenario_overview["federal_programs"] - baseline_overview["federal_programs"],
+        "state_delta": scenario_overview["state_programs"] - baseline_overview["state_programs"],
+    }
+
+
+def list_changed_programs(
+    baseline_index: dict[str, dict[str, Any]],
+    scenario_index: dict[str, dict[str, Any]],
+    *,
+    direction: str,
+) -> list[dict[str, Any]]:
+    changes: list[dict[str, Any]] = []
+    all_slugs = sorted(set(baseline_index) | set(scenario_index))
+    for slug in all_slugs:
+        baseline = baseline_index.get(slug)
+        scenario = scenario_index.get(slug)
+        if scenario is None:
+            continue
+        baseline_rank = status_rank(baseline["eligibility_status"]) if baseline else -1
+        scenario_rank = status_rank(scenario["eligibility_status"])
+        if direction == "gain" and baseline_rank < 2 <= scenario_rank:
+            changes.append(build_change_payload(slug, baseline, scenario))
+        elif direction == "improve" and baseline and scenario_rank > baseline_rank:
+            changes.append(build_change_payload(slug, baseline, scenario))
+        elif direction == "loss" and baseline and baseline_rank >= 2 > scenario_rank:
+            changes.append(build_change_payload(slug, baseline, scenario))
+    return changes[:6]
+
+
+def build_change_payload(
+    slug: str,
+    baseline: Optional[dict[str, Any]],
+    scenario: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "program_slug": slug,
+        "program_name": scenario["program_name"],
+        "before_status": baseline["eligibility_status"] if baseline else "not_present",
+        "after_status": scenario["eligibility_status"],
+        "after_confidence": scenario["decision_certainty"],
+        "apply_url": scenario["apply_url"],
+    }
 
 
 def build_application_guidance(program: Program, data_sources: list[dict[str, Any]]) -> list[dict[str, str]]:

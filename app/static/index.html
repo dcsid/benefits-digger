@@ -10,9 +10,9 @@
     <main class="layout">
       <section class="hero">
         <p class="eyebrow">Benefits Digger</p>
-        <h1>Screen federal programs and state entry points with source-backed reasoning.</h1>
+        <h1>Plan, compare, and pursue benefits with official government evidence.</h1>
         <p class="lede">
-          This MVP separates federal and state results, asks adaptive questions, and keeps source sync plus review tasks visible.
+          Screen benefits, compare what-if scenarios, browse the official catalog, and leave with a clearer action plan grounded in government sources.
         </p>
       </section>
 
@@ -81,6 +81,41 @@
 
       <section class="panel wide">
         <div class="row spread">
+          <h2>Planning Dashboard</h2>
+          <span id="plan-depth-pill" class="pill">No active session</span>
+        </div>
+        <div id="plan-empty" class="empty">Start a session to unlock planning summary, action steps, and missing-fact analysis.</div>
+        <div id="plan-shell" class="stack hidden">
+          <div id="overview-metrics" class="metric-grid"></div>
+          <div class="results-grid planner-grid">
+            <div>
+              <h3>Benefit stack</h3>
+              <div id="benefit-stack" class="stack"></div>
+            </div>
+            <div>
+              <h3>Top missing facts</h3>
+              <div id="missing-facts" class="stack"></div>
+            </div>
+          </div>
+          <div class="results-grid planner-grid">
+            <div>
+              <h3>Recommended next actions</h3>
+              <div id="action-plan" class="stack"></div>
+            </div>
+            <div>
+              <h3>Official source hub</h3>
+              <div id="source-hub" class="stack"></div>
+            </div>
+          </div>
+          <div>
+            <h3>Planning notes</h3>
+            <div id="planning-notes" class="stack"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel wide">
+        <div class="row spread">
           <h2>Results</h2>
           <span id="result-count" class="pill">0 live matches</span>
         </div>
@@ -94,6 +129,33 @@
             <div id="state-results" class="result-list empty">No state results yet.</div>
           </div>
         </div>
+      </section>
+
+      <section class="panel">
+        <div class="row spread">
+          <h2>What-If Lab</h2>
+          <span class="pill">Scenario compare</span>
+        </div>
+        <p class="meta">
+          Run scenario comparisons without changing your saved answers. These presets show how the result set changes if a life fact shifts.
+        </p>
+        <div id="scenario-presets" class="stack"></div>
+        <div id="scenario-results" class="stack empty">Start a session, then run a scenario.</div>
+      </section>
+
+      <section class="panel">
+        <div class="row spread">
+          <h2>Program Explorer</h2>
+          <button type="button" id="refresh-explorer" class="ghost">Refresh Explorer</button>
+        </div>
+        <form id="explorer-form" class="stack">
+          <label>
+            Search official programs
+            <input type="text" id="explorer-query" placeholder="Try retirement, disability, funeral, veterans..." />
+          </label>
+          <button type="submit">Search catalog</button>
+        </form>
+        <div id="explorer-results" class="stack empty">Use the explorer to browse the current official program catalog.</div>
       </section>
 
       <section class="panel wide">

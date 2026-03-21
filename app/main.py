@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,15 +10,18 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine, get_db
 from app.models import ScreeningSession
-from app.schemas import AnswerPayload, SessionCreatePayload, SessionEnvelope
+from app.schemas import AnswerPayload, ComparePayload, SessionCreatePayload, SessionEnvelope
 from app.services import (
     bootstrap_catalog,
+    compare_scenarios,
     compute_results,
+    compute_plan,
     create_session,
     get_next_question,
     get_program_detail,
     get_session_or_404,
     get_answers_map,
+    list_program_catalog,
     list_review_tasks,
     list_states,
     provisional_result_count,
@@ -67,6 +71,26 @@ def states(db: Session = Depends(get_db)) -> list[dict[str, str]]:
     return list_states(db)
 
 
+@app.get(f"{settings.api_v1_prefix}/programs")
+def program_catalog(
+    query: str = "",
+    scope: str = "both",
+    state_code: Optional[str] = None,
+    categories: str = "",
+    limit: int = 40,
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    category_list = [item.strip() for item in categories.split(",") if item.strip()]
+    return list_program_catalog(
+        db,
+        query=query,
+        scope=scope,
+        state_code=state_code,
+        categories=category_list,
+        limit=min(max(limit, 1), 100),
+    )
+
+
 @app.post(f"{settings.api_v1_prefix}/sessions", response_model=SessionEnvelope)
 def create_screening_session(payload: SessionCreatePayload, db: Session = Depends(get_db)) -> SessionEnvelope:
     session = create_session(
@@ -113,6 +137,35 @@ def screening_results(session_id: str, db: Session = Depends(get_db)) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return compute_results(db, session)
+
+
+@app.get(f"{settings.api_v1_prefix}/sessions/{{session_id}}/plan")
+def screening_plan(session_id: str, db: Session = Depends(get_db)) -> dict:
+    try:
+        session = get_session_or_404(db, session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return compute_plan(db, session)
+
+
+@app.post(f"{settings.api_v1_prefix}/sessions/{{session_id}}/compare")
+def screening_compare(session_id: str, payload: ComparePayload, db: Session = Depends(get_db)) -> dict:
+    try:
+        session = get_session_or_404(db, session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return compare_scenarios(
+        db,
+        session,
+        [
+            {
+                "name": scenario.name,
+                "description": scenario.description,
+                "answers": scenario.answers,
+            }
+            for scenario in payload.scenarios
+        ],
+    )
 
 
 @app.get(f"{settings.api_v1_prefix}/programs/{{slug}}")

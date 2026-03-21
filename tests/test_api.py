@@ -107,3 +107,59 @@ def test_deep_mode_is_more_aggressive_than_quick() -> None:
         assert deep_follow_up.status_code == 200
         assert quick_follow_up.json()["next_question"] is None
         assert deep_follow_up.json()["next_question"] is not None
+
+
+def test_plan_compare_and_catalog_endpoints_work() -> None:
+    with TestClient(app) as client:
+        session_response = client.post(
+            "/api/v1/sessions",
+            json={
+                "scope": "both",
+                "state_code": "NY",
+                "categories": ["retirement_seniors"],
+                "depth_mode": "deep",
+            },
+        )
+        assert session_response.status_code == 200
+        session_id = session_response.json()["session_id"]
+
+        client.post(
+            f"/api/v1/sessions/{session_id}/answers",
+            json={
+                "answers": {
+                    "applicant_paid_into_SS": "Yes",
+                    "applicant_date_of_birth": "1950-01-01",
+                }
+            },
+        )
+
+        plan_response = client.get(f"/api/v1/sessions/{session_id}/plan")
+        assert plan_response.status_code == 200
+        plan = plan_response.json()
+        assert plan["overview"]["likely_programs"] >= 1
+        assert plan["official_source_hub"]
+
+        compare_response = client.post(
+            f"/api/v1/sessions/{session_id}/compare",
+            json={
+                "scenarios": [
+                    {
+                        "name": "Limited income scenario",
+                        "answers": {"applicant_income": "Yes"},
+                    }
+                ]
+            },
+        )
+        assert compare_response.status_code == 200
+        comparison = compare_response.json()
+        assert comparison["comparisons"]
+        assert "summary" in comparison["comparisons"][0]
+
+        catalog_response = client.get(
+            "/api/v1/programs",
+            params={"query": "retirement", "scope": "federal"},
+        )
+        assert catalog_response.status_code == 200
+        catalog = catalog_response.json()
+        assert catalog
+        assert all(".gov" in item["apply_url"] or ".us" in item["apply_url"] for item in catalog if item["apply_url"])

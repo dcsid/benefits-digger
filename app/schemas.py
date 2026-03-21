@@ -34,3 +34,13 @@ class SessionEnvelope(BaseModel):
     session_id: str
     next_question: Optional[QuestionOut]
     provisional_result_count: int = 0
+
+
+class CompareScenarioInput(BaseModel):
+    name: str
+    description: Optional[str] = None
+    answers: dict[str, Any] = Field(default_factory=dict)
+
+
+class ComparePayload(BaseModel):
+    scenarios: list[CompareScenarioInput] = Field(default_factory=list)
