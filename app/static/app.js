@@ -734,7 +734,7 @@ startForm.addEventListener("submit", async (event) => {
       scrollToTopOf(startScreeningPanel);
       scopeSelect.focus();
       return;
-    }
+    }// 1. Your validation check (Prevents errors)
     if (scopeSelect.value !== "federal" && !stateSelect.value) {
       const msg = "Please choose a state before starting state or combined screening.";
       setStatus(msg);
@@ -743,13 +743,18 @@ startForm.addEventListener("submit", async (event) => {
       stateSelect.focus();
       return;
     }
+
+    // 2. Your frontend loading UI improvements
     if (submitBtn) {
       setLoading(submitBtn, true);
       setBusyButtonText(submitBtn, true, "Searching...", "Apply selections");
     }
     federalResults.classList.add("skeleton");
     stateResults.classList.add("skeleton");
-    setStatus("Searching for matching programs...");
+
+    // 3. Your teammate's updated session status messages
+    const hasState = scopeSelect.value !== "federal" && stateSelect.value;
+    setStatus(hasState ? "Creating session and loading state benefits..." : "Creating session...");
     const payload = {
       scope: scopeSelect.value,
       state_code: stateSelect.value || null,

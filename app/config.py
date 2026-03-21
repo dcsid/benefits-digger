@@ -16,10 +16,13 @@ class Settings(BaseSettings):
     auto_sync_remote: bool = True
     max_results_per_section: int = 12
     admin_key: str = ""
+    gemini_api_key: str = ""
     static_dir: Path = BASE_DIR / "app" / "static"
 
     model_config = SettingsConfigDict(
         env_prefix="BENEFITS_DIGGER_",
+        env_file=str(BASE_DIR / ".env"),
+        env_file_encoding="utf-8",
         case_sensitive=False,
     )
 

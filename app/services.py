@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime
 from typing import Any, Optional, Tuple
 
@@ -62,6 +63,31 @@ DEPTH_ANCHORS: list[tuple[float, dict[str, Any]]] = [
 ]
 
 DEPTH_MODE_TO_VALUE = {"quick": 0.0, "standard": 0.5, "deep": 1.0}
+STATE_RESIDENCY_TERMS = (
+    "resident",
+    "residency",
+    "live in",
+    "lives in",
+    "lived in",
+    "living in",
+    "currently live",
+    "currently resides",
+    "reside in",
+    "household in",
+    "address in",
+    "domiciled",
+)
+SUBSTATE_LOCATION_TERMS = (
+    "county",
+    "zip",
+    "zip code",
+    "zipcode",
+    "postal code",
+    "city",
+    "town",
+    "municipality",
+    "address",
+)
 
 
 def _lerp(a: float, b: float, t: float) -> float:
@@ -108,6 +134,104 @@ def depth_value_to_tier(depth_value: float) -> str:
     if depth_value < 0.67:
         return "standard"
     return "detailed"
+
+
+def normalize_match_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return re.sub(r"\s+", " ", str(value).replace("_", " ").strip().lower())
+
+
+def values_are_booleanish(values: Optional[list[Any]]) -> bool:
+    if not values:
+        return False
+    normalized = {normalize_match_text(value) for value in values if value is not None}
+    return bool(normalized) and normalized.issubset({"yes", "no", "true", "false", "1", "0"})
+
+
+def options_are_booleanish(options: Optional[list[dict[str, Any]]]) -> bool:
+    if not options:
+        return False
+    values = []
+    for option in options:
+        if not isinstance(option, dict):
+            continue
+        values.append(option.get("value", option.get("label")))
+    return values_are_booleanish(values)
+
+
+def is_redundant_state_residency_signal(
+    *,
+    state_code: str,
+    state_name: str,
+    question_key: Optional[str] = None,
+    prompt: Optional[str] = None,
+    hint: Optional[str] = None,
+    label: Optional[str] = None,
+    options: Optional[list[dict[str, Any]]] = None,
+    expected_values: Optional[list[Any]] = None,
+) -> bool:
+    normalized_state_code = normalize_match_text(state_code)
+    normalized_state_name = normalize_match_text(state_name)
+    normalized_texts = [
+        normalize_match_text(question_key),
+        normalize_match_text(prompt),
+        normalize_match_text(hint),
+        normalize_match_text(label),
+    ]
+
+    residency_signal = False
+    for text in normalized_texts:
+        if not text:
+            continue
+        mentions_state = bool(
+            normalized_state_name and normalized_state_name in text
+            or normalized_state_code and normalized_state_code in set(text.split())
+        )
+        mentions_residency = any(term in text for term in STATE_RESIDENCY_TERMS)
+        if mentions_state and mentions_residency:
+            residency_signal = True
+            break
+
+    if not residency_signal:
+        return False
+
+    asks_substate_location = any(
+        term in text
+        for text in normalized_texts
+        for term in SUBSTATE_LOCATION_TERMS
+    )
+    if asks_substate_location:
+        return False
+
+    return True
+
+
+def is_redundant_state_residency_rule(
+    *,
+    session_state_code: Optional[str],
+    program: Program,
+    rule: EligibilityRule,
+    question: Optional[Question] = None,
+) -> bool:
+    if not session_state_code or program.jurisdiction.level != "state":
+        return False
+    if session_state_code.upper() != program.jurisdiction.code.upper():
+        return False
+    if rule.question_key == "state_code":
+        return False
+    return is_redundant_state_residency_signal(
+        state_code=program.jurisdiction.code,
+        state_name=program.jurisdiction.name,
+        question_key=rule.question_key,
+        prompt=question.prompt if question else None,
+        hint=question.hint if question else None,
+        label=rule.label,
+        options=question.options_json if question else None,
+        expected_values=rule.expected_values_json if isinstance(rule.expected_values_json, list) else None,
+    )
+
+
 CATEGORY_FILTER_MAP = {
     "children_families": {"children_families", "family"},
     "death": {"death", "survivor", "funeral_assistance"},
@@ -459,6 +583,11 @@ def create_session(
     db.add(session)
     db.commit()
     db.refresh(session)
+
+    if scope in {"state", "both"} and session.state_code:
+        from app.gemini import ensure_state_programs
+        ensure_state_programs(db, session.state_code, categories)
+
     return session
 
 
@@ -782,6 +911,14 @@ def evaluate_program(db: Session, program: Program, version: ProgramVersion, ans
     source_keys = {rule.source_key for rule in rules}
 
     for rule in rules:
+        question = db.scalar(select(Question).where(Question.key == rule.question_key))
+        if is_redundant_state_residency_rule(
+            session_state_code=answers.get("state_code"),
+            program=program,
+            rule=rule,
+            question=question,
+        ):
+            continue
         if not isinstance(rule.expected_values_json, list):
             continue
         answer_value = answers.get(rule.question_key)
@@ -790,7 +927,6 @@ def evaluate_program(db: Session, program: Program, version: ProgramVersion, ans
         if outcome == "pass":
             matched_reasons.append(rule.label)
         elif outcome == "unknown":
-            question = db.scalar(select(Question).where(Question.key == rule.question_key))
             missing_facts.append(question.prompt if question else rule.question_key)
         else:
             failed_reasons.append(rule.label)
@@ -935,6 +1071,13 @@ def score_unanswered_questions(
                 continue
             question = db.scalar(select(Question).where(Question.key == rule.question_key))
             if question is None:
+                continue
+            if is_redundant_state_residency_rule(
+                session_state_code=session.state_code,
+                program=program,
+                rule=rule,
+                question=question,
+            ):
                 continue
             if enforce_depth_unlocks and not question_is_unlocked(question, answers_count, policy):
                 continue

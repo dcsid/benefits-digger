@@ -1,8 +1,10 @@
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +17,190 @@ os.environ["BENEFITS_DIGGER_AUTO_SYNC_REMOTE"] = "false"
 sys.path.insert(0, str(ROOT))
 
 from app.main import app
+from app.db import SessionLocal
+from app.models import Agency, AmountRule, EligibilityRule, Program, ProgramVersion, Question, Jurisdiction
+
+
+def seed_state_program_with_redundant_residency_rule() -> None:
+    with SessionLocal() as db:
+        california = db.scalar(select(Jurisdiction).where(Jurisdiction.code == "CA", Jurisdiction.level == "state"))
+        assert california is not None
+
+        agency = db.scalar(
+            select(Agency).where(
+                Agency.jurisdiction_id == california.id,
+                Agency.name == "California Test Benefits Agency",
+            )
+        )
+        if agency is None:
+            agency = Agency(
+                jurisdiction_id=california.id,
+                name="California Test Benefits Agency",
+                homepage_url="https://www.ca.gov/",
+            )
+            db.add(agency)
+            db.flush()
+
+        redundant_questions = [
+            (
+                "ca_resident",
+                "Are you a resident of California?",
+                [
+                    {"label": "Yes", "value": "Yes"},
+                    {"label": "No", "value": "No"},
+                ],
+                500.0,
+            ),
+            (
+                "ca_residency_status",
+                "What is your California residency status?",
+                [
+                    {"label": "Resident", "value": "resident"},
+                    {"label": "Non-resident", "value": "non_resident"},
+                ],
+                490.0,
+            ),
+            (
+                "ca_currently_live",
+                "Do you currently live in California?",
+                [
+                    {"label": "Yes", "value": "Yes"},
+                    {"label": "No", "value": "No"},
+                ],
+                480.0,
+            ),
+        ]
+        for key, prompt, options, weight in redundant_questions:
+            question = db.scalar(select(Question).where(Question.key == key))
+            if question is None:
+                db.add(
+                    Question(
+                        key=key,
+                        prompt=prompt,
+                        hint=None,
+                        input_type="radio",
+                        sensitivity_level="low",
+                        options_json=options,
+                        sort_weight=weight,
+                    )
+                )
+
+        income_question = db.scalar(select(Question).where(Question.key == "ca_low_income"))
+        if income_question is None:
+            db.add(
+                Question(
+                    key="ca_low_income",
+                    prompt="Do you have low income?",
+                    hint=None,
+                    input_type="radio",
+                    sensitivity_level="low",
+                    options_json=[
+                        {"label": "Yes", "value": "Yes"},
+                        {"label": "No", "value": "No"},
+                    ],
+                    sort_weight=100.0,
+                )
+            )
+            db.flush()
+
+        program = db.scalar(select(Program).where(Program.slug == "ca-test-cash-support"))
+        if program is None:
+            program = Program(
+                slug="ca-test-cash-support",
+                name="California Test Cash Support",
+                kind="benefit",
+                category="cash",
+                family="ca_test_cash_support",
+                summary="Regression test program for redundant state residency questions.",
+                apply_url="https://www.ca.gov/",
+                status="active",
+                jurisdiction_id=california.id,
+                agency_id=agency.id,
+            )
+            db.add(program)
+            db.flush()
+
+        version = db.scalar(
+            select(ProgramVersion).where(
+                ProgramVersion.program_id == program.id,
+                ProgramVersion.publication_state == "published",
+            )
+        )
+        if version is None:
+            version = ProgramVersion(
+                program_id=program.id,
+                version_label="test-regression",
+                signature="ca-test-cash-support-v1",
+                publication_state="published",
+                published_at=datetime.utcnow(),
+                change_summary="Regression fixture for state residency filtering.",
+                source_freshness_days=0,
+            )
+            db.add(version)
+            db.flush()
+
+            db.add_all(
+                [
+                    EligibilityRule(
+                        program_version_id=version.id,
+                        question_key="state_code",
+                        operator="matches_any",
+                        expected_values_json=["CA"],
+                        label="Available in California.",
+                        priority=100,
+                        source_key="test-ca-source",
+                        source_citation="https://www.ca.gov/",
+                    ),
+                    EligibilityRule(
+                        program_version_id=version.id,
+                        question_key="ca_resident",
+                        operator="matches_any",
+                        expected_values_json=["Yes"],
+                        label="You are a resident of California.",
+                        priority=99,
+                        source_key="test-ca-source",
+                        source_citation="https://www.ca.gov/",
+                    ),
+                    EligibilityRule(
+                        program_version_id=version.id,
+                        question_key="ca_residency_status",
+                        operator="matches_any",
+                        expected_values_json=["resident"],
+                        label="You have California residency.",
+                        priority=98,
+                        source_key="test-ca-source",
+                        source_citation="https://www.ca.gov/",
+                    ),
+                    EligibilityRule(
+                        program_version_id=version.id,
+                        question_key="ca_currently_live",
+                        operator="matches_any",
+                        expected_values_json=["Yes"],
+                        label="You currently live in California.",
+                        priority=97,
+                        source_key="test-ca-source",
+                        source_citation="https://www.ca.gov/",
+                    ),
+                    EligibilityRule(
+                        program_version_id=version.id,
+                        question_key="ca_low_income",
+                        operator="matches_any",
+                        expected_values_json=["Yes"],
+                        label="You have low income.",
+                        priority=80,
+                        source_key="test-ca-source",
+                        source_citation="https://www.ca.gov/",
+                    ),
+                    AmountRule(
+                        program_version_id=version.id,
+                        amount_type="range",
+                        display_text="Test support amount.",
+                        source_key="test-ca-source",
+                    ),
+                ]
+            )
+
+        db.commit()
 
 
 def test_session_flow_returns_federal_and_state_results() -> None:
@@ -163,3 +349,39 @@ def test_plan_compare_and_catalog_endpoints_work() -> None:
         catalog = catalog_response.json()
         assert catalog
         assert all(".gov" in item["apply_url"] or ".us" in item["apply_url"] for item in catalog if item["apply_url"])
+
+
+def test_selected_state_suppresses_redundant_residency_questions_across_depths() -> None:
+    seed_state_program_with_redundant_residency_rule()
+
+    with TestClient(app) as client:
+        for depth_mode in ("quick", "standard", "deep"):
+            session_response = client.post(
+                "/api/v1/sessions",
+                json={
+                    "scope": "state",
+                    "state_code": "CA",
+                    "categories": ["welfare_cash_assistance"],
+                    "depth_mode": depth_mode,
+                },
+            )
+            assert session_response.status_code == 200
+            session = session_response.json()
+            assert session["next_question"]["key"] == "ca_low_income"
+
+            answer_response = client.post(
+                f"/api/v1/sessions/{session['session_id']}/answers",
+                json={"answers": {"ca_low_income": "Yes"}},
+            )
+            assert answer_response.status_code == 200
+            next_question = answer_response.json()["next_question"]
+            assert next_question is None or next_question["key"] != "ca_resident"
+
+            results_response = client.get(f"/api/v1/sessions/{session['session_id']}/results")
+            assert results_response.status_code == 200
+            payload = results_response.json()
+            program = next(item for item in payload["state_results"] if item["program_slug"] == "ca-test-cash-support")
+            assert program["eligibility_status"] == "likely_eligible"
+            assert all("resident of california" not in fact.lower() for fact in program["missing_facts"])
+            assert all("california residency" not in fact.lower() for fact in program["missing_facts"])
+            assert all("currently live in california" not in fact.lower() for fact in program["missing_facts"])
