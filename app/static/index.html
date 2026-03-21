@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Benefits Digger</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="hero">
+        <p class="eyebrow">Benefits Digger</p>
+        <h1>Screen federal programs and state entry points with source-backed reasoning.</h1>
+        <p class="lede">
+          This MVP separates federal and state results, asks adaptive questions, and keeps source sync plus review tasks visible.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Start Screening</h2>
+        <form id="start-form" class="stack">
+          <label>
+            Scope
+            <select id="scope" name="scope">
+              <option value="both">Federal and state</option>
+              <option value="federal">Federal only</option>
+              <option value="state">State only</option>
+            </select>
+          </label>
+
+          <label>
+            State
+            <select id="state-code" name="state_code">
+              <option value="">Choose a state</option>
+            </select>
+          </label>
+
+          <label>
+            Depth
+            <select id="depth-mode" name="depth_mode">
+              <option value="quick">Quick check</option>
+              <option value="standard" selected>Standard</option>
+              <option value="deep">Deep check</option>
+            </select>
+          </label>
+
+          <fieldset class="category-picker">
+            <legend>Benefit categories</legend>
+            <p class="meta">
+              Select at least one category to find benefits you may qualify for and information on how to apply.
+            </p>
+            <div class="row">
+              <button type="button" id="select-all-categories" class="ghost">Select all</button>
+              <button type="button" id="clear-categories" class="ghost">Clear</button>
+            </div>
+            <div id="category-list" class="category-grid"></div>
+          </fieldset>
+
+          <div class="row">
+            <button type="submit">Apply selections</button>
+            <button type="button" id="sync-button" class="ghost">Refresh Official Sources</button>
+          </div>
+        </form>
+        <p id="status" class="status"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Question Flow</h2>
+        <div id="question-empty" class="empty">Start a session to begin the screener.</div>
+        <form id="question-form" class="stack hidden">
+          <div id="question-shell"></div>
+          <div class="row">
+            <button type="submit">Save Answer</button>
+            <button type="button" id="show-results" class="ghost">Show Results Now</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel wide">
+        <div class="row spread">
+          <h2>Results</h2>
+          <span id="result-count" class="pill">0 live matches</span>
+        </div>
+        <div class="results-grid">
+          <div>
+            <h3>Federal Results</h3>
+            <div id="federal-results" class="result-list empty">No federal results yet.</div>
+          </div>
+          <div>
+            <h3>State Results</h3>
+            <div id="state-results" class="result-list empty">No state results yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel wide">
+        <div class="row spread">
+          <h2>Review Queue</h2>
+          <button type="button" id="refresh-review" class="ghost">Refresh Queue</button>
+        </div>
+        <div id="review-tasks" class="review-list empty">No review tasks yet.</div>
+      </section>
+    </main>
+    <script src="/static/app.js" defer></script>
+  </body>
+  </html>

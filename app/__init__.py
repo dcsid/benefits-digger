@@ -1,0 +1,2 @@
+"""Benefits Digger application package."""
+
