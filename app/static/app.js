@@ -863,6 +863,43 @@ lifeEventsNode.addEventListener("click", async (event) => {
   }
 });
 
+function resetApp() {
+  state.sessionId = null;
+  state.currentQuestion = null;
+  state.latestPlan = null;
+
+  scopeSelect.value = "both";
+  stateSelect.value = "";
+  depthSlider.value = 0.5;
+  setAllCategories(false);
+  updateStateVisibility();
+  updateDepthDescription();
+
+  questionForm.classList.add("hidden");
+  questionShell.innerHTML = "";
+  questionEmpty.textContent = "Start a session to begin the screener.";
+  questionEmpty.classList.remove("hidden");
+
+  renderPlan(null);
+
+  resultCount.textContent = "0 live matches";
+  federalResults.innerHTML = "No federal results yet.";
+  federalResults.classList.add("empty");
+  stateResults.innerHTML = "No state results yet.";
+  stateResults.classList.add("empty");
+
+  scenarioResults.innerHTML = "Start a session, then run a scenario.";
+  scenarioResults.classList.add("empty");
+
+  explorerResults.innerHTML = "Use the explorer to browse the current official program catalog.";
+  explorerResults.classList.add("empty");
+  explorerQuery.value = "";
+
+  setStatus("");
+}
+
+document.querySelector("#reset-button").addEventListener("click", resetApp);
+
 document.querySelector("#export-results").addEventListener("click", () => {
   if (!state.sessionId) {
     setStatus("Start a session first to export results.");
