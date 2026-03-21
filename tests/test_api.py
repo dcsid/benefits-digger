@@ -41,22 +41,49 @@ def seed_state_program_with_redundant_residency_rule() -> None:
             db.add(agency)
             db.flush()
 
-        resident_question = db.scalar(select(Question).where(Question.key == "ca_resident"))
-        if resident_question is None:
-            db.add(
-                Question(
-                    key="ca_resident",
-                    prompt="Are you a resident of California?",
-                    hint=None,
-                    input_type="radio",
-                    sensitivity_level="low",
-                    options_json=[
-                        {"label": "Yes", "value": "Yes"},
-                        {"label": "No", "value": "No"},
-                    ],
-                    sort_weight=500.0,
+        redundant_questions = [
+            (
+                "ca_resident",
+                "Are you a resident of California?",
+                [
+                    {"label": "Yes", "value": "Yes"},
+                    {"label": "No", "value": "No"},
+                ],
+                500.0,
+            ),
+            (
+                "ca_residency_status",
+                "What is your California residency status?",
+                [
+                    {"label": "Resident", "value": "resident"},
+                    {"label": "Non-resident", "value": "non_resident"},
+                ],
+                490.0,
+            ),
+            (
+                "ca_currently_live",
+                "Do you currently live in California?",
+                [
+                    {"label": "Yes", "value": "Yes"},
+                    {"label": "No", "value": "No"},
+                ],
+                480.0,
+            ),
+        ]
+        for key, prompt, options, weight in redundant_questions:
+            question = db.scalar(select(Question).where(Question.key == key))
+            if question is None:
+                db.add(
+                    Question(
+                        key=key,
+                        prompt=prompt,
+                        hint=None,
+                        input_type="radio",
+                        sensitivity_level="low",
+                        options_json=options,
+                        sort_weight=weight,
+                    )
                 )
-            )
 
         income_question = db.scalar(select(Question).where(Question.key == "ca_low_income"))
         if income_question is None:
@@ -131,6 +158,26 @@ def seed_state_program_with_redundant_residency_rule() -> None:
                         expected_values_json=["Yes"],
                         label="You are a resident of California.",
                         priority=99,
+                        source_key="test-ca-source",
+                        source_citation="https://www.ca.gov/",
+                    ),
+                    EligibilityRule(
+                        program_version_id=version.id,
+                        question_key="ca_residency_status",
+                        operator="matches_any",
+                        expected_values_json=["resident"],
+                        label="You have California residency.",
+                        priority=98,
+                        source_key="test-ca-source",
+                        source_citation="https://www.ca.gov/",
+                    ),
+                    EligibilityRule(
+                        program_version_id=version.id,
+                        question_key="ca_currently_live",
+                        operator="matches_any",
+                        expected_values_json=["Yes"],
+                        label="You currently live in California.",
+                        priority=97,
                         source_key="test-ca-source",
                         source_citation="https://www.ca.gov/",
                     ),
@@ -336,3 +383,5 @@ def test_selected_state_suppresses_redundant_residency_questions_across_depths()
             program = next(item for item in payload["state_results"] if item["program_slug"] == "ca-test-cash-support")
             assert program["eligibility_status"] == "likely_eligible"
             assert all("resident of california" not in fact.lower() for fact in program["missing_facts"])
+            assert all("california residency" not in fact.lower() for fact in program["missing_facts"])
+            assert all("currently live in california" not in fact.lower() for fact in program["missing_facts"])

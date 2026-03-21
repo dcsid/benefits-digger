@@ -106,6 +106,8 @@ IMPORTANT:
 - Include 2-5 programs per category.
 - Every radio/select question MUST have options.
 - Question keys must be unique across all programs (use descriptive names).
+- Do NOT include state residency or "do you live in {state_name}" questions, because the applicant already selected {state_name} in the product.
+- If a program needs county, ZIP code, city, or another sub-state location, ask for that specific detail instead of general residency.
 - Return ONLY the JSON array, no markdown, no explanation."""
 
 

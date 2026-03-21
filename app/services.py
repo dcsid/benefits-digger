@@ -68,6 +68,7 @@ STATE_RESIDENCY_TERMS = (
     "residency",
     "live in",
     "lives in",
+    "lived in",
     "living in",
     "currently live",
     "currently resides",
@@ -75,6 +76,17 @@ STATE_RESIDENCY_TERMS = (
     "household in",
     "address in",
     "domiciled",
+)
+SUBSTATE_LOCATION_TERMS = (
+    "county",
+    "zip",
+    "zip code",
+    "zipcode",
+    "postal code",
+    "city",
+    "town",
+    "municipality",
+    "address",
 )
 
 
@@ -161,11 +173,15 @@ def is_redundant_state_residency_signal(
 ) -> bool:
     normalized_state_code = normalize_match_text(state_code)
     normalized_state_name = normalize_match_text(state_name)
-    key_text = normalize_match_text(question_key)
-    key_tokens = set(key_text.split())
+    normalized_texts = [
+        normalize_match_text(question_key),
+        normalize_match_text(prompt),
+        normalize_match_text(hint),
+        normalize_match_text(label),
+    ]
 
     residency_signal = False
-    for text in (key_text, normalize_match_text(prompt), normalize_match_text(hint), normalize_match_text(label)):
+    for text in normalized_texts:
         if not text:
             continue
         mentions_state = bool(
@@ -180,8 +196,15 @@ def is_redundant_state_residency_signal(
     if not residency_signal:
         return False
 
-    key_signals_residency = "resident" in key_tokens or "residency" in key_tokens
-    return key_signals_residency or options_are_booleanish(options) or values_are_booleanish(expected_values)
+    asks_substate_location = any(
+        term in text
+        for text in normalized_texts
+        for term in SUBSTATE_LOCATION_TERMS
+    )
+    if asks_substate_location:
+        return False
+
+    return True
 
 
 def is_redundant_state_residency_rule(
