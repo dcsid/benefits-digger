@@ -6,6 +6,57 @@ const state = {
   isScreeningFinished: false,
 };
 
+/* ── i18n translation system ─────────────────────────────────── */
+
+let _locale = localStorage.getItem("bd_locale") || "en";
+let _strings = {};
+
+async function loadLocale(locale) {
+  try {
+    const res = await fetch(`/static/locales/${locale}.json`);
+    if (!res.ok) throw new Error(`Locale ${locale} not found`);
+    _strings = await res.json();
+    _locale = locale;
+    localStorage.setItem("bd_locale", locale);
+    document.documentElement.lang = locale;
+    applyI18n();
+  } catch {
+    if (locale !== "en") await loadLocale("en");
+  }
+}
+
+function t(key, params = {}) {
+  let s = _strings[key] || key;
+  for (const [k, v] of Object.entries(params)) {
+    s = s.replace(`{${k}}`, v);
+  }
+  return s;
+}
+
+function applyI18n() {
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.dataset.i18n;
+    const translated = t(key);
+    if (translated !== key) {
+      if (el.dataset.i18nAttr === "placeholder") {
+        el.placeholder = translated;
+      } else if (el.dataset.i18nAttr === "title") {
+        el.title = translated;
+      } else {
+        el.innerHTML = translated;
+      }
+    }
+  });
+}
+
+function getLocale() { return _locale; }
+
+/* Auto-load locale on page load and sync language selector */
+loadLocale(_locale).then(() => {
+  const langSelect = document.querySelector("#lang-select");
+  if (langSelect) langSelect.value = _locale;
+});
+
 function setSessionId(id) {
   state.sessionId = id;
   if (id) localStorage.setItem("bd_session_id", id);
@@ -134,10 +185,10 @@ function statusLabel(status) {
 function renderResultCard(item) {
   const reasons = item.matched_reasons.length
     ? `<ul class="reason-list">${item.matched_reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`
-    : "<p class='meta'>No matched reasons yet.</p>";
+    : `<p class='meta'>${t("card.noMatchedReasons")}</p>`;
   const missing = item.missing_facts.length
     ? `<ul class="reason-list">${item.missing_facts.map((fact) => `<li>${escapeHtml(fact)}</li>`).join("")}</ul>`
-    : "<p class='meta'>No missing facts for this current pass.</p>";
+    : `<p class='meta'>${t("card.noMissingFacts")}</p>`;
   const dataSources = item.data_gathered_from.length
     ? `<ul class="source-list">${item.data_gathered_from
         .map(
@@ -147,33 +198,44 @@ function renderResultCard(item) {
             }</li>`,
         )
         .join("")}</ul>`
-    : "<p class='meta'>No official government sources attached.</p>";
+    : `<p class='meta'>${t("card.noSources")}</p>`;
   const howToGet = item.how_to_get_benefit.length
     ? `<ul class="source-list">${item.how_to_get_benefit
         .map((step) => `<li><a href="${escapeHtml(step.url)}" target="_blank" rel="noreferrer">${escapeHtml(step.label)}</a></li>`)
         .join("")}</ul>`
-    : "<p class='meta'>No official application path is available for this result yet.</p>";
+    : `<p class='meta'>${t("card.noApplicationPath")}</p>`;
+  const documents = (item.documents && item.documents.length)
+    ? `<ul class="checklist">${item.documents.map((doc) =>
+        `<li class="checklist-item">
+          <label><input type="checkbox" class="doc-check" data-program="${escapeHtml(item.program_slug)}" data-doc="${escapeHtml(doc.name)}">
+          <strong>${escapeHtml(doc.name)}</strong> <span class="badge-doc ${escapeHtml(doc.type)}">${escapeHtml(doc.type)}</span></label>
+          ${doc.description ? `<p class="meta">${escapeHtml(doc.description)}</p>` : ""}
+        </li>`).join("")}</ul>`
+    : `<p class='meta'>${t("card.noDocuments")}</p>`;
+
   const applicationLink = item.apply_url
-    ? `<a href="${escapeHtml(item.apply_url)}" target="_blank" rel="noreferrer">Open official government page</a>`
-    : "<span class='meta'>Use the official sources below.</span>";
+    ? `<a href="${escapeHtml(item.apply_url)}" target="_blank" rel="noreferrer">${t("card.openOfficial")}</a>`
+    : `<span class='meta'>${t("card.useSourcesBelow")}</span>`;
 
   const certainty = item.decision_certainty ?? 0;
-  const amountDisplay = item.estimated_amount?.display ?? "Not available";
+  const amountObj = item.estimated_amount || {};
+  const amountDisplay = amountObj.display ?? t("card.notAvailable");
+  const amountCalculated = amountObj.calculated ? t("card.amountEstimated") : "";
 
   return `
     <article class="card">
       <header>
         <div>
           <h3>${escapeHtml(item.program_name)}</h3>
-          <p class="meta">${escapeHtml(item.agency || "Unknown agency")} · ${escapeHtml(item.jurisdiction.name)}</p>
+          <p class="meta">${escapeHtml(item.agency || t("card.unknownAgency"))} · ${escapeHtml(item.jurisdiction.name)}</p>
         </div>
         <span class="badge ${escapeHtml(item.eligibility_status)}">${statusLabel(item.eligibility_status)}</span>
       </header>
-      <p>${escapeHtml(item.summary || "No summary available.")}</p>
+      <p>${escapeHtml(item.summary || t("card.noSummary"))}</p>
       <div class="stack">
         <div>
           <div class="row spread" style="cursor:pointer" onclick="this.parentElement.querySelector('.certainty-breakdown').classList.toggle('open')">
-            <strong>Confidence <span class="meta" style="font-weight:normal;font-size:0.82rem">(click to expand)</span></strong>
+            <strong>${t("card.confidence")} <span class="meta" style="font-weight:normal;font-size:0.82rem">${t("card.clickExpand")}</span></strong>
             <span>${certainty}/100</span>
           </div>
           <div class="meter"><span style="width: ${certainty}%"></span></div>
@@ -187,23 +249,29 @@ function renderResultCard(item) {
             `).join("") : "<p class='meta'>No breakdown available.</p>"}
         </div>
         <div>
-          <strong>Amount</strong>
+          <strong>${t("card.amount")}${amountCalculated}</strong>
           <p class="meta">${escapeHtml(amountDisplay)}</p>
         </div>
         <div>
-          <strong>Why it matched</strong>
+          <strong>${t("card.whyMatched")}</strong>
           ${reasons}
         </div>
         <div>
-          <strong>What is still missing</strong>
+          <strong>${t("card.missingFacts")}</strong>
           ${missing}
         </div>
         <div>
-          <strong>Data gathered from official government websites</strong>
+          <div class="row spread" style="cursor:pointer" onclick="this.parentElement.querySelector('.documents-section').classList.toggle('open')">
+            <strong>${t("card.documentsNeeded")} <span class="meta" style="font-weight:normal;font-size:0.82rem">${t("card.clickExpand")}</span></strong>
+          </div>
+          <div class="documents-section">${documents}</div>
+        </div>
+        <div>
+          <strong>${t("card.dataGathered")}</strong>
           ${dataSources}
         </div>
         <div class="row">
-          <strong>How to get this benefit</strong>
+          <strong>${t("card.howToGet")}</strong>
         </div>
         <div>
           ${howToGet}

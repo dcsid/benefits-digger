@@ -89,6 +89,10 @@ For each program return an object with these exact fields:
 - "apply_url": official .gov URL to apply or learn more — must be a real URL ending in .gov (string)
 - "category": one of [{valid_categories}] (string)
 - "amount_description": what the benefit provides, e.g. "Up to $234/month per person" (string)
+- "documents": array of 2-5 objects listing documents needed to apply, each with:
+  - "name": document name (string)
+  - "type": "required" or "recommended" (string)
+  - "description": brief description of the document (string)
 - "eligibility_criteria": array of 2-5 objects, each with:
   - "question_key": snake_case identifier prefixed with "{state_code.lower()}_", e.g. "{state_code.lower()}_household_income" (string)
   - "prompt": the eligibility question to ask the applicant (string)
@@ -168,6 +172,7 @@ def _ingest_gemini_programs(db: Session, state_code: str, programs: list[dict[st
             category=prog_data.get("category", "general"),
             summary=prog_data.get("summary", ""),
             apply_url=prog_data.get("apply_url", ""),
+            documents_json=prog_data.get("documents"),
             status="active",
             jurisdiction_id=jurisdiction.id,
             agency_id=agency.id,

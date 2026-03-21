@@ -46,10 +46,42 @@ def _migrate_depth_value(db_engine):
                 conn.execute(text("ALTER TABLE screening_sessions ADD COLUMN depth_value REAL DEFAULT 0.5"))
 
 
+def _migrate_documents_json(db_engine):
+    """Add documents_json column to programs if missing (SQLite)."""
+    from sqlalchemy import inspect as sa_inspect, text
+    inspector = sa_inspect(db_engine)
+    if "programs" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("programs")}
+        if "documents_json" not in cols:
+            with db_engine.begin() as conn:
+                conn.execute(text("ALTER TABLE programs ADD COLUMN documents_json JSON"))
+
+
+def _migrate_amount_rule_formulas(db_engine):
+    """Add formula columns to amount_rules if missing (SQLite)."""
+    from sqlalchemy import inspect as sa_inspect, text
+    inspector = sa_inspect(db_engine)
+    if "amount_rules" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("amount_rules")}
+        with db_engine.begin() as conn:
+            if "formula_json" not in cols:
+                conn.execute(text("ALTER TABLE amount_rules ADD COLUMN formula_json JSON"))
+            if "input_keys" not in cols:
+                conn.execute(text("ALTER TABLE amount_rules ADD COLUMN input_keys JSON"))
+            if "min_amount" not in cols:
+                conn.execute(text("ALTER TABLE amount_rules ADD COLUMN min_amount REAL"))
+            if "max_amount" not in cols:
+                conn.execute(text("ALTER TABLE amount_rules ADD COLUMN max_amount REAL"))
+            if "period" not in cols:
+                conn.execute(text("ALTER TABLE amount_rules ADD COLUMN period VARCHAR(32)"))
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     _migrate_depth_value(engine)
+    _migrate_documents_json(engine)
+    _migrate_amount_rule_formulas(engine)
     db = SessionLocal()
     try:
         bootstrap_catalog(db, use_remote=settings.auto_sync_remote)

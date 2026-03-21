@@ -9,17 +9,21 @@
   <body>
     <main class="layout">
       <nav class="nav-bar wide">
-        <a href="/" class="nav-link">Home</a>
-        <a href="/dashboard" class="nav-link">Dashboard</a>
-        <a href="/results" class="nav-link">Results</a>
-        <a href="/whatif" class="nav-link">What-If Lab</a>
-        <a href="/explorer" class="nav-link nav-link--active" aria-current="page">Explorer</a>
+        <a href="/" class="nav-link" data-i18n="nav.home">Home</a>
+        <a href="/dashboard" class="nav-link" data-i18n="nav.dashboard">Dashboard</a>
+        <a href="/results" class="nav-link" data-i18n="nav.results">Results</a>
+        <a href="/whatif" class="nav-link" data-i18n="nav.whatif">What-If Lab</a>
+        <a href="/explorer" class="nav-link nav-link--active" aria-current="page" data-i18n="nav.explorer">Explorer</a>
+        <select id="lang-select" class="lang-select" onchange="loadLocale(this.value)">
+          <option value="en">EN</option>
+          <option value="es">ES</option>
+        </select>
       </nav>
 
       <section class="panel wide">
         <div class="row spread">
-          <h2>Program Explorer</h2>
-          <button type="button" id="refresh-explorer" class="ghost">Refresh Explorer</button>
+          <h2 data-i18n="explorer.title">Program Explorer</h2>
+          <button type="button" id="refresh-explorer" class="ghost" data-i18n="explorer.refresh">Refresh Explorer</button>
         </div>
         <p class="meta">
           Hybrid Explorer combines plain-English need descriptions with the official catalog. It may use Gemini for interpretation when configured, and always falls back to grounded local matching.
@@ -47,8 +51,8 @@
               <textarea id="explorer-description" rows="4" placeholder="Example: I lost a family member in California and need help with funeral costs and survivor benefits."></textarea>
             </label>
             <label>
-              Exact keyword search
-              <input type="text" id="explorer-query" placeholder="Try retirement, disability, funeral, veterans..." />
+              <span data-i18n="explorer.search">Exact keyword search</span>
+              <input type="text" id="explorer-query" placeholder="Try retirement, disability, funeral, veterans..." data-i18n="explorer.placeholder" data-i18n-attr="placeholder" />
             </label>
             <button type="submit">Run hybrid search</button>
           </form>

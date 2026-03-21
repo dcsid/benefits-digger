@@ -9,23 +9,27 @@
   <body>
     <main class="layout">
       <nav class="nav-bar wide">
-        <a href="/" class="nav-link nav-link--active" aria-current="page">Home</a>
-        <a href="/dashboard" class="nav-link">Dashboard</a>
-        <a href="/results" class="nav-link">Results</a>
-        <a href="/whatif" class="nav-link">What-If Lab</a>
-        <a href="/explorer" class="nav-link">Explorer</a>
+        <a href="/" class="nav-link nav-link--active" aria-current="page" data-i18n="nav.home">Home</a>
+        <a href="/dashboard" class="nav-link" data-i18n="nav.dashboard">Dashboard</a>
+        <a href="/results" class="nav-link" data-i18n="nav.results">Results</a>
+        <a href="/whatif" class="nav-link" data-i18n="nav.whatif">What-If Lab</a>
+        <a href="/explorer" class="nav-link" data-i18n="nav.explorer">Explorer</a>
+        <select id="lang-select" class="lang-select" onchange="loadLocale(this.value)">
+          <option value="en">EN</option>
+          <option value="es">ES</option>
+        </select>
       </nav>
 
       <section class="hero">
-        <p class="eyebrow">Benefits Digger</p>
-        <h1>Plan, compare, and pursue benefits with official government evidence.</h1>
-        <p class="lede">
+        <p class="eyebrow" data-i18n="app.eyebrow">Benefits Digger</p>
+        <h1 data-i18n="app.headline">Plan, compare, and pursue benefits with official government evidence.</h1>
+        <p class="lede" data-i18n="app.lede">
           Screen benefits, compare what-if scenarios, browse the official catalog, and leave with a clearer action plan grounded in government sources.
         </p>
       </section>
 
       <section class="panel" id="start-screening-panel">
-        <h2>Start Screening</h2>
+        <h2 data-i18n="home.startScreening">Start Screening</h2>
         <form id="start-form" class="stack">
           <label>
             Scope
@@ -59,44 +63,44 @@
           </p>
 
           <fieldset class="category-picker">
-            <legend>Benefit categories</legend>
+            <legend data-i18n="home.categories">Benefit categories</legend>
             <p class="meta">
               Select at least one category to find benefits you may qualify for and information on how to apply.
             </p>
             <div class="row">
-              <button type="button" id="select-all-categories" class="ghost">Select all</button>
-              <button type="button" id="clear-categories" class="ghost">Clear</button>
+              <button type="button" id="select-all-categories" class="ghost" data-i18n="home.selectAll">Select all</button>
+              <button type="button" id="clear-categories" class="ghost" data-i18n="home.clear">Clear</button>
             </div>
             <div id="category-list" class="category-grid"></div>
           </fieldset>
 
           <div class="row form-actions">
-            <button type="submit">Apply selections</button>
-            <button type="button" id="reset-button" class="ghost">Reset</button>
+            <button type="submit" data-i18n="home.apply">Apply selections</button>
+            <button type="button" id="reset-button" class="ghost" data-i18n="home.reset">Reset</button>
           </div>
           <div class="row utility-actions">
-            <button type="button" id="sync-button" class="ghost subtle">Refresh Official Sources</button>
+            <button type="button" id="sync-button" class="ghost subtle" data-i18n="home.refreshSources">Refresh Official Sources</button>
           </div>
         </form>
         <p id="status" class="status"></p>
       </section>
 
       <section class="panel">
-        <h2>Question Flow</h2>
-        <div id="question-empty" class="empty">Start a session to begin the screener.</div>
+        <h2 data-i18n="home.questionFlow">Question Flow</h2>
+        <div id="question-empty" class="empty" data-i18n="home.questionEmpty">Start a session to begin the screener.</div>
         <form id="question-form" class="stack hidden">
           <div id="question-shell"></div>
           <div class="row">
-            <button type="submit">Save Answer</button>
-            <button type="button" id="show-results" class="ghost">Show Results Now</button>
+            <button type="submit" data-i18n="home.saveAnswer">Save Answer</button>
+            <button type="button" id="show-results" class="ghost" data-i18n="home.showResults">Show Results Now</button>
           </div>
         </form>
       </section>
 
       <section class="panel wide">
         <div class="row spread">
-          <h2>Review Queue</h2>
-          <button type="button" id="refresh-review" class="ghost">Refresh Queue</button>
+          <h2 data-i18n="home.reviewQueue">Review Queue</h2>
+          <button type="button" id="refresh-review" class="ghost" data-i18n="home.refreshQueue">Refresh Queue</button>
         </div>
         <div id="review-tasks" class="review-list empty">No review tasks yet.</div>
       </section>

@@ -352,6 +352,7 @@ def sync_federal_catalog(db: Session, catalog: dict[str, Any], source_mode: str)
                 family=benefit["family"],
                 summary=benefit["summary"],
                 apply_url=official_program_url,
+                documents_json=benefit.get("documents"),
                 status="active",
                 jurisdiction_id=federal.id,
                 agency_id=agency.id,
@@ -365,6 +366,7 @@ def sync_federal_catalog(db: Session, catalog: dict[str, Any], source_mode: str)
             program.family = benefit["family"]
             program.summary = benefit["summary"]
             program.apply_url = official_program_url
+            program.documents_json = benefit.get("documents") or program.documents_json
             program.status = "active"
             program.agency_id = agency.id
 
@@ -421,8 +423,13 @@ def sync_federal_catalog(db: Session, catalog: dict[str, Any], source_mode: str)
             db.add(
                 AmountRule(
                     program_version_id=version.id,
-                    amount_type="range",
+                    amount_type="formula" if benefit.get("amount_formula") else "range",
                     display_text=benefit.get("amount_display"),
+                    formula_json=benefit.get("amount_formula"),
+                    input_keys=list(benefit["amount_formula"].get("inputs", {}).values()) if benefit.get("amount_formula") and benefit["amount_formula"].get("inputs") else None,
+                    min_amount=benefit.get("amount_min"),
+                    max_amount=benefit.get("amount_max"),
+                    period=benefit.get("amount_period"),
                     source_key=source.key,
                 )
             )
@@ -714,6 +721,12 @@ def compute_plan(db: Session, session: ScreeningSession) -> dict[str, Any]:
     ) if positive_results else 0
     next_question = get_next_question(db, session, answers)
 
+    estimated_monthly = sum(
+        item["estimated_amount"].get("amount", 0)
+        for item in likely
+        if item["estimated_amount"].get("calculated") and item["estimated_amount"].get("period") == "monthly"
+    )
+
     return {
         "profile": build_profile_summary(session, answers),
         "overview": {
@@ -724,13 +737,39 @@ def compute_plan(db: Session, session: ScreeningSession) -> dict[str, Any]:
             "average_rule_coverage": average_coverage,
             "answered_questions": len(answers),
             "next_question_key": next_question.key if next_question else None,
+            "estimated_monthly_total": round(estimated_monthly),
         },
         "benefit_stack": build_benefit_stack(positive_results),
         "top_missing_facts": top_missing_facts,
         "action_plan": action_plan,
         "official_source_hub": official_source_hub[:10],
         "planning_notes": build_planning_notes(session, likely, possible, top_missing_facts),
+        "document_checklist": _aggregate_documents(likely + possible),
     }
+
+
+def _aggregate_documents(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Deduplicate documents across eligible programs into a master checklist."""
+    seen: dict[str, dict[str, Any]] = {}
+    for result in results:
+        for doc in result.get("documents") or []:
+            name = doc.get("name", "")
+            if not name:
+                continue
+            key = name.lower().strip()
+            if key not in seen:
+                seen[key] = {
+                    "name": name,
+                    "type": doc.get("type", "recommended"),
+                    "description": doc.get("description", ""),
+                    "programs": [],
+                }
+            seen[key]["programs"].append(result["program_name"])
+            if doc.get("type") == "required":
+                seen[key]["type"] = "required"
+    required = [d for d in seen.values() if d["type"] == "required"]
+    recommended = [d for d in seen.values() if d["type"] != "required"]
+    return required + recommended
 
 
 def get_program_detail(db: Session, slug: str) -> Optional[dict[str, Any]]:
@@ -750,6 +789,7 @@ def get_program_detail(db: Session, slug: str) -> Optional[dict[str, Any]]:
         "family": program.family,
         "summary": program.summary,
         "apply_url": program.apply_url,
+        "documents": program.documents_json or [],
         "jurisdiction": {
             "code": program.jurisdiction.code,
             "level": program.jurisdiction.level,
@@ -896,6 +936,98 @@ def list_program_catalog(
     return payload
 
 
+def estimate_amount(amount_rule: Optional[AmountRule], answers: dict[str, Any]) -> dict[str, Any]:
+    """Compute an estimated benefit amount using formula if available, else static text."""
+    if not amount_rule:
+        return {"certainty": "unknown", "display": "Amount not available in the current source set.", "calculated": False}
+
+    if not amount_rule.formula_json:
+        return {
+            "certainty": "unknown" if amount_rule.amount_type == "unknown" else amount_rule.amount_type,
+            "display": amount_rule.display_text or "Amount not available.",
+            "calculated": False,
+        }
+
+    formula = amount_rule.formula_json
+    formula_type = formula.get("type", "")
+    period = amount_rule.period or "monthly"
+
+    try:
+        if formula_type == "table_lookup":
+            lookup_key = formula.get("lookup_key", "")
+            result_field = formula.get("result_field", "max_benefit")
+            user_val = answers.get(lookup_key)
+            if user_val is None:
+                return {
+                    "certainty": "range" if amount_rule.min_amount and amount_rule.max_amount else amount_rule.amount_type,
+                    "display": amount_rule.display_text or "Answer more questions for an estimate.",
+                    "calculated": False,
+                    "period": period,
+                    "min": amount_rule.min_amount,
+                    "max": amount_rule.max_amount,
+                }
+            try:
+                user_val = int(float(str(user_val)))
+            except (ValueError, TypeError):
+                user_val = 1
+            table = formula.get("table", [])
+            best_row = None
+            for row in table:
+                if row.get(lookup_key) is not None and int(row[lookup_key]) <= user_val:
+                    best_row = row
+            if best_row is None and table:
+                best_row = table[0]
+            if best_row:
+                amount = best_row.get(result_field, 0)
+                return {
+                    "certainty": "estimated",
+                    "display": f"Up to ${amount:,.0f}/{period}",
+                    "calculated": True,
+                    "period": period,
+                    "amount": amount,
+                }
+
+        elif formula_type == "fixed":
+            amount = formula.get("amount", 0)
+            return {
+                "certainty": "exact",
+                "display": f"${amount:,.0f}/{period}",
+                "calculated": True,
+                "period": period,
+                "amount": amount,
+            }
+
+        elif formula_type == "linear":
+            base = formula.get("base", 0)
+            inputs = formula.get("inputs", {})
+            total = base
+            for coeff_name, question_key in inputs.items():
+                val = answers.get(question_key)
+                if val is not None:
+                    try:
+                        total += formula.get(coeff_name, 0) * float(str(val))
+                    except (ValueError, TypeError):
+                        pass
+            total = max(0, total)
+            if amount_rule.max_amount:
+                total = min(total, amount_rule.max_amount)
+            return {
+                "certainty": "estimated",
+                "display": f"~${total:,.0f}/{period}",
+                "calculated": True,
+                "period": period,
+                "amount": total,
+            }
+    except Exception:
+        pass
+
+    return {
+        "certainty": amount_rule.amount_type,
+        "display": amount_rule.display_text or "Amount not available.",
+        "calculated": False,
+    }
+
+
 def evaluate_program(db: Session, program: Program, version: ProgramVersion, answers: dict[str, Any]) -> dict[str, Any]:
     rules = db.scalars(
         select(EligibilityRule)
@@ -973,10 +1105,7 @@ def evaluate_program(db: Session, program: Program, version: ProgramVersion, ans
             "program_determinism": program_determinism,
             "amount_determinism": amount_determinism,
         },
-        "estimated_amount": {
-            "certainty": "unknown" if not amount_rule or amount_rule.amount_type == "unknown" else amount_rule.amount_type,
-            "display": amount_rule.display_text if amount_rule else "Amount not available in the current source set.",
-        },
+        "estimated_amount": estimate_amount(amount_rule, answers),
         "summary": program.summary,
         "jurisdiction": {
             "level": program.jurisdiction.level,
@@ -988,6 +1117,7 @@ def evaluate_program(db: Session, program: Program, version: ProgramVersion, ans
         "matched_reasons": matched_reasons[:4],
         "missing_facts": missing_facts[:4],
         "failed_reasons": failed_reasons[:4],
+        "documents": program.documents_json or [],
         "data_gathered_from": data_sources,
         "how_to_get_benefit": how_to_get_benefit,
         "sources": data_sources,

@@ -111,6 +111,12 @@ FEDERAL_SAMPLE_BENEFITS = [
             },
         ],
         "amount_display": "Monthly amount depends on work history and claiming age.",
+        "documents": [
+            {"name": "Social Security card or number", "type": "required", "description": "Your 9-digit SSN"},
+            {"name": "Proof of age", "type": "required", "description": "Birth certificate or passport"},
+            {"name": "W-2 forms or self-employment tax returns", "type": "required", "description": "Most recent year's earnings records"},
+            {"name": "Bank account information", "type": "recommended", "description": "For direct deposit of benefits"},
+        ],
     },
     {
         "title": "Social Security Disability Insurance (SSDI)",
@@ -137,6 +143,13 @@ FEDERAL_SAMPLE_BENEFITS = [
             },
         ],
         "amount_display": "Monthly amount depends on work history.",
+        "documents": [
+            {"name": "Social Security card or number", "type": "required", "description": "Your 9-digit SSN"},
+            {"name": "Medical records", "type": "required", "description": "Documentation of your disability from doctors, hospitals, or clinics"},
+            {"name": "Proof of age", "type": "required", "description": "Birth certificate or passport"},
+            {"name": "W-2 forms or self-employment tax returns", "type": "required", "description": "Earnings records for the current and prior year"},
+            {"name": "Bank account information", "type": "recommended", "description": "For direct deposit of benefits"},
+        ],
     },
     {
         "title": "Supplemental Security Income (SSI)",
@@ -157,7 +170,20 @@ FEDERAL_SAMPLE_BENEFITS = [
                 "acceptable_values": ["Yes"],
             },
         ],
-        "amount_display": "Amount depends on income, living arrangement, and state supplements.",
+        "amount_display": "Up to $943/month for individuals, $1,415/month for couples (2024 rates).",
+        "amount_formula": {
+            "type": "fixed",
+            "amount": 943,
+        },
+        "amount_period": "monthly",
+        "amount_max": 943,
+        "documents": [
+            {"name": "Social Security card or number", "type": "required", "description": "Your 9-digit SSN"},
+            {"name": "Proof of income and resources", "type": "required", "description": "Pay stubs, bank statements, or benefit award letters"},
+            {"name": "Medical records", "type": "required", "description": "Documentation of your disability"},
+            {"name": "Proof of living arrangement", "type": "required", "description": "Lease, mortgage statement, or letter from landlord"},
+            {"name": "Proof of citizenship or immigration status", "type": "required", "description": "Birth certificate, passport, or immigration documents"},
+        ],
     },
     {
         "title": "VA disability compensation",
@@ -179,6 +205,12 @@ FEDERAL_SAMPLE_BENEFITS = [
             },
         ],
         "amount_display": "Amount depends on disability rating and dependents.",
+        "documents": [
+            {"name": "DD-214 (discharge papers)", "type": "required", "description": "Certificate of Release or Discharge from Active Duty"},
+            {"name": "Medical records", "type": "required", "description": "Evidence linking your disability to military service"},
+            {"name": "VA Form 21-526EZ", "type": "required", "description": "Application for Disability Compensation"},
+            {"name": "Bank account information", "type": "recommended", "description": "For direct deposit of benefits"},
+        ],
     },
     {
         "title": "Survivor benefits",
@@ -195,6 +227,12 @@ FEDERAL_SAMPLE_BENEFITS = [
             }
         ],
         "amount_display": "Monthly amount depends on the worker's record and your relationship.",
+        "documents": [
+            {"name": "Deceased's Social Security number", "type": "required", "description": "The worker's SSN"},
+            {"name": "Death certificate", "type": "required", "description": "Certified copy of the death certificate"},
+            {"name": "Proof of relationship", "type": "required", "description": "Marriage certificate, birth certificate, or adoption papers"},
+            {"name": "Bank account information", "type": "recommended", "description": "For direct deposit of benefits"},
+        ],
     },
     {
         "title": "COVID-19 funeral assistance",
@@ -221,6 +259,12 @@ FEDERAL_SAMPLE_BENEFITS = [
             },
         ],
         "amount_display": "Reimbursement amount depends on eligible funeral expenses.",
+        "documents": [
+            {"name": "Death certificate", "type": "required", "description": "Must attribute the death to COVID-19"},
+            {"name": "Funeral expense receipts", "type": "required", "description": "Itemized receipts or contracts from funeral providers"},
+            {"name": "Proof of U.S. residency", "type": "required", "description": "For the person who incurred the funeral expenses"},
+            {"name": "FEMA application number", "type": "recommended", "description": "If you previously applied for other FEMA assistance"},
+        ],
     },
 ]
 

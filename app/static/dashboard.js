@@ -7,6 +7,7 @@ const missingFacts = document.querySelector("#missing-facts");
 const actionPlan = document.querySelector("#action-plan");
 const sourceHub = document.querySelector("#source-hub");
 const planningNotes = document.querySelector("#planning-notes");
+const documentChecklist = document.querySelector("#document-checklist");
 
 function renderPlan(plan) {
   state.latestPlan = plan;
@@ -23,12 +24,16 @@ function renderPlan(plan) {
   const tierLabel = dv < 0.33 ? "quick" : dv < 0.67 ? "standard" : "deep";
   planDepthPill.textContent = `${tierLabel} depth (${Math.round(dv * 100)}%)`;
 
+  const estMonthly = plan.overview.estimated_monthly_total;
   const metrics = [
     { label: "Likely programs", value: plan.overview.likely_programs },
     { label: "Possible programs", value: plan.overview.possible_programs },
     { label: "Answered questions", value: plan.overview.answered_questions },
     { label: "Average rule coverage", value: `${plan.overview.average_rule_coverage}%` },
   ];
+  if (estMonthly > 0) {
+    metrics.push({ label: "Est. monthly benefits", value: `$${estMonthly.toLocaleString()}` });
+  }
 
   overviewMetrics.innerHTML = metrics
     .map(
@@ -94,6 +99,17 @@ function renderPlan(plan) {
         .join("")
     : "<p class='meta'>No official source hub yet.</p>";
 
+  const docs = plan.document_checklist || [];
+  documentChecklist.innerHTML = docs.length
+    ? `<ul class="checklist">${docs.map((doc) =>
+        `<li class="checklist-item">
+          <label><input type="checkbox" class="doc-check" data-program="plan" data-doc="${escapeHtml(doc.name)}">
+          <strong>${escapeHtml(doc.name)}</strong> <span class="badge-doc ${escapeHtml(doc.type)}">${escapeHtml(doc.type)}</span></label>
+          ${doc.description ? `<p class="meta">${escapeHtml(doc.description)}</p>` : ""}
+          <p class="meta">Needed for: ${doc.programs.map(escapeHtml).join(", ")}</p>
+        </li>`).join("")}</ul>`
+    : "<p class='meta'>No documents required yet. Complete screening to see what you need.</p>";
+
   planningNotes.innerHTML = plan.planning_notes.length
     ? plan.planning_notes
         .map((note) => `<article class="mini-card"><p>${escapeHtml(note)}</p></article>`)
@@ -110,6 +126,29 @@ async function loadPlan() {
   const payload = await getJson(`/api/v1/sessions/${state.sessionId}/plan`);
   renderPlan(payload);
 }
+
+document.querySelector("#download-pdf").addEventListener("click", () => {
+  if (!state.sessionId || typeof html2pdf === "undefined") return;
+  const element = planShell;
+  if (!element) return;
+  const btn = document.querySelector("#download-pdf");
+  setBusyButtonText(btn, true, "Generating...", "Download PDF");
+  btn.disabled = true;
+  html2pdf()
+    .set({
+      margin: 10,
+      filename: "benefits-dashboard.pdf",
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+    })
+    .from(element)
+    .save()
+    .then(() => {
+      setBusyButtonText(btn, false, "Generating...", "Download PDF");
+      btn.disabled = false;
+    });
+});
 
 loadPlan().catch((error) => {
   planEmpty.textContent = `Could not load plan: ${error.message}`;
