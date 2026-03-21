@@ -672,7 +672,8 @@ startForm.addEventListener("submit", async (event) => {
       return;
     }
     if (submitBtn) setLoading(submitBtn, true);
-    setStatus("Creating session...");
+    const hasState = scopeSelect.value !== "federal" && stateSelect.value;
+    setStatus(hasState ? "Creating session and loading state benefits..." : "Creating session...");
     const payload = {
       scope: scopeSelect.value,
       state_code: stateSelect.value || null,

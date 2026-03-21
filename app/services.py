@@ -459,6 +459,11 @@ def create_session(
     db.add(session)
     db.commit()
     db.refresh(session)
+
+    if scope in {"state", "both"} and session.state_code:
+        from app.gemini import ensure_state_programs
+        ensure_state_programs(db, session.state_code, categories)
+
     return session
 
 
