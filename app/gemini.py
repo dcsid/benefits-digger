@@ -25,6 +25,7 @@ from app.services import (
     CATEGORY_LABELS,
     get_or_create_agency,
     get_or_create_jurisdiction,
+    is_redundant_state_residency_signal,
     upsert_questions,
     upsert_question_variants,
 )
@@ -207,6 +208,17 @@ def _ingest_gemini_programs(db: Session, state_code: str, programs: list[dict[st
         for criterion in prog_data.get("eligibility_criteria", []):
             qkey = criterion.get("question_key", "").strip()
             if not qkey:
+                continue
+            if is_redundant_state_residency_signal(
+                state_code=state_code,
+                state_name=state_name,
+                question_key=qkey,
+                prompt=criterion.get("prompt"),
+                hint=criterion.get("hint"),
+                label=criterion.get("label"),
+                options=criterion.get("options"),
+                expected_values=criterion.get("expected_values"),
+            ):
                 continue
 
             all_questions.append({
