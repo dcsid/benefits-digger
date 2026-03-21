@@ -157,6 +157,21 @@ fieldset {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.choice {
+display: flex;
+align-items: center;
+gap: 0.6rem;
+}
+
+.choice input[type="radio"] {
+margin: 0;
+flex: 0 0 auto;
+}
+
+.choice span {
+line-height: 1.2;
+}
+
 .category-option input {
   margin: 0;
 }
