@@ -34,9 +34,21 @@ from app.services import (
 settings = get_settings()
 
 
+def _migrate_depth_value(db_engine):
+    """Add depth_value column to screening_sessions if missing (SQLite)."""
+    from sqlalchemy import inspect as sa_inspect, text
+    inspector = sa_inspect(db_engine)
+    if "screening_sessions" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("screening_sessions")}
+        if "depth_value" not in cols:
+            with db_engine.begin() as conn:
+                conn.execute(text("ALTER TABLE screening_sessions ADD COLUMN depth_value REAL DEFAULT 0.5"))
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _migrate_depth_value(engine)
     db = SessionLocal()
     try:
         bootstrap_catalog(db, use_remote=settings.auto_sync_remote)
@@ -110,13 +122,14 @@ def create_screening_session(payload: SessionCreatePayload, db: Session = Depend
         scope=payload.scope,
         state_code=payload.state_code,
         categories=payload.categories,
-        depth_mode=payload.depth_mode,
+        depth_mode=payload.depth_mode or "standard",
+        depth_value=payload.depth_value,
     )
     answers = get_answers_map(db, session)
     next_question = get_next_question(db, session, answers)
     return SessionEnvelope(
         session_id=session.public_id,
-        next_question=serialize_question(db, next_question),
+        next_question=serialize_question(db, next_question, session.depth_value),
         provisional_result_count=provisional_result_count(db, session),
     )
 
@@ -137,7 +150,7 @@ def answer_screening_question(
     next_question = get_next_question(db, session, answers)
     return SessionEnvelope(
         session_id=session.public_id,
-        next_question=serialize_question(db, next_question),
+        next_question=serialize_question(db, next_question, session.depth_value),
         provisional_result_count=provisional_result_count(db, session),
     )
 

@@ -94,6 +94,23 @@ class Question(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class QuestionVariant(Base):
+    __tablename__ = "question_variants"
+    __table_args__ = (
+        UniqueConstraint("question_key", "depth_tier", name="uq_variant_key_tier"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    question_key: Mapped[str] = mapped_column(String(120), ForeignKey("questions.key"), index=True)
+    depth_tier: Mapped[str] = mapped_column(String(16))  # "simple", "standard", "detailed"
+    prompt: Mapped[str] = mapped_column(Text)
+    hint: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    input_type: Mapped[str] = mapped_column(String(32))
+    options_json: Mapped[Optional[list[dict]]] = mapped_column(JSON, nullable=True)
+    normalizer: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class EligibilityRule(Base):
     __tablename__ = "eligibility_rules"
 
@@ -198,6 +215,7 @@ class ScreeningSession(Base):
     state_code: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     categories_json: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
     depth_mode: Mapped[str] = mapped_column(String(16), default="standard")
+    depth_value: Mapped[float] = mapped_column(Float, default=0.5)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     answers: Mapped[list["SessionAnswer"]] = relationship(back_populates="session", cascade="all, delete-orphan")

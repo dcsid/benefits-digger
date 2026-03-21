@@ -9,12 +9,20 @@ class SessionCreatePayload(BaseModel):
     scope: Literal["federal", "state", "both"] = "both"
     state_code: Optional[str] = None
     categories: list[str] = Field(default_factory=list)
-    depth_mode: Literal["quick", "standard", "deep"] = "standard"
+    depth_mode: Optional[Literal["quick", "standard", "deep"]] = None
+    depth_value: float = Field(default=0.5, ge=0.0, le=1.0)
 
     @model_validator(mode="after")
     def _require_state_for_state_scope(self):
         if self.scope in ("state", "both") and not self.state_code:
             raise ValueError("state_code is required when scope is 'state' or 'both'")
+        return self
+
+    @model_validator(mode="after")
+    def _resolve_depth(self):
+        if self.depth_mode is not None and self.depth_value == 0.5:
+            mapping = {"quick": 0.0, "standard": 0.5, "deep": 1.0}
+            self.depth_value = mapping.get(self.depth_mode, 0.5)
         return self
 
 

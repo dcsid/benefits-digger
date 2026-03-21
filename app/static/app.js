@@ -18,14 +18,11 @@ const categoryDefinitions = [
   { value: "retirement_seniors", label: "Retirement and seniors" },
   { value: "welfare_cash_assistance", label: "Welfare and cash assistance" },
 ];
-const depthDescriptions = {
-  quick:
-    "Quick asks fewer questions, avoids aggressive follow-ups for as long as it can, and stops early once it has a light screen.",
-  standard:
-    "Standard asks a balanced number of questions and starts pulling in more detailed follow-ups after the basics.",
-  deep:
-    "Deep is more aggressive: it keeps going longer and starts medium and high-sensitivity follow-ups much earlier to tighten the match.",
-};
+const depthDescriptions = [
+  { at: 0.0, label: "Quick", text: "Quick asks fewer, simpler questions and stops early once it has a light screen." },
+  { at: 0.5, label: "Standard", text: "Standard asks a balanced number of questions with moderate detail." },
+  { at: 1.0, label: "Deep", text: "Deep asks more specific questions with legal references and keeps going longer to tighten the match." },
+];
 const scenarioPresets = [
   {
     name: "If I had limited income and resources",
@@ -60,7 +57,7 @@ const lifeEventPresets = [
     title: "I just lost my job",
     description: "Unemployment, food assistance, and emergency help",
     scope: "both",
-    depth_mode: "standard",
+    depth_value: 0.5,
     categories: ["jobs_unemployment", "food", "welfare_cash_assistance", "housing_utilities"],
     prefilled_answers: {},
   },
@@ -69,7 +66,7 @@ const lifeEventPresets = [
     title: "A family member passed away",
     description: "Survivor benefits, funeral assistance, and support",
     scope: "both",
-    depth_mode: "standard",
+    depth_value: 0.5,
     categories: ["death", "welfare_cash_assistance"],
     prefilled_answers: { applicant_dolo: "Yes" },
   },
@@ -78,7 +75,7 @@ const lifeEventPresets = [
     title: "I'm turning 65",
     description: "Retirement, Medicare, Social Security, and senior programs",
     scope: "both",
-    depth_mode: "standard",
+    depth_value: 0.5,
     categories: ["retirement_seniors", "health"],
     prefilled_answers: {},
   },
@@ -87,7 +84,7 @@ const lifeEventPresets = [
     title: "I had a baby",
     description: "Family benefits, child care, WIC, and health coverage",
     scope: "both",
-    depth_mode: "standard",
+    depth_value: 0.5,
     categories: ["children_families", "health", "food"],
     prefilled_answers: {},
   },
@@ -96,7 +93,7 @@ const lifeEventPresets = [
     title: "I became disabled",
     description: "Disability benefits, SSI, SSDI, and medical assistance",
     scope: "both",
-    depth_mode: "deep",
+    depth_value: 1.0,
     categories: ["disabilities", "health", "welfare_cash_assistance"],
     prefilled_answers: { applicant_disability: "Yes" },
   },
@@ -105,7 +102,7 @@ const lifeEventPresets = [
     title: "I served in the military",
     description: "Veterans benefits, pensions, VA health care",
     scope: "both",
-    depth_mode: "deep",
+    depth_value: 1.0,
     categories: ["military_veterans", "health", "housing_utilities"],
     prefilled_answers: { applicant_served_in_active_military: "Yes" },
   },
@@ -113,7 +110,7 @@ const lifeEventPresets = [
 
 const scopeSelect = document.querySelector("#scope");
 const stateSelect = document.querySelector("#state-code");
-const depthSelect = document.querySelector("#depth-mode");
+const depthSlider = document.querySelector("#depth-slider");
 const depthDescription = document.querySelector("#depth-description");
 const startForm = document.querySelector("#start-form");
 const questionForm = document.querySelector("#question-form");
@@ -206,7 +203,13 @@ function updateStateVisibility() {
 }
 
 function updateDepthDescription() {
-  depthDescription.textContent = depthDescriptions[depthSelect.value] || depthDescriptions.standard;
+  const val = parseFloat(depthSlider.value);
+  let best = depthDescriptions[0];
+  for (const d of depthDescriptions) {
+    if (Math.abs(d.at - val) < Math.abs(best.at - val)) best = d;
+  }
+  const maxQ = Math.round(4 + val * 20);
+  depthDescription.textContent = `${best.text} (~${maxQ} questions)`;
 }
 
 function renderCategories() {
@@ -414,7 +417,9 @@ function renderPlan(plan) {
 
   planShell.classList.remove("hidden");
   planEmpty.classList.add("hidden");
-  planDepthPill.textContent = `${plan.profile.depth_mode} depth`;
+  const dv = plan.profile.depth_value ?? 0.5;
+  const tierLabel = dv < 0.33 ? "quick" : dv < 0.67 ? "standard" : "deep";
+  planDepthPill.textContent = `${tierLabel} depth (${Math.round(dv * 100)}%)`;
 
   const metrics = [
     { label: "Likely programs", value: plan.overview.likely_programs },
@@ -672,7 +677,7 @@ startForm.addEventListener("submit", async (event) => {
       scope: scopeSelect.value,
       state_code: stateSelect.value || null,
       categories,
-      depth_mode: depthSelect.value,
+      depth_value: parseFloat(depthSlider.value),
     };
     const session = await getJson("/api/v1/sessions", {
       method: "POST",
@@ -749,7 +754,7 @@ document.querySelector("#refresh-explorer").addEventListener("click", loadExplor
 document.querySelector("#select-all-categories").addEventListener("click", () => setAllCategories(true));
 document.querySelector("#clear-categories").addEventListener("click", () => setAllCategories(false));
 scopeSelect.addEventListener("change", updateStateVisibility);
-depthSelect.addEventListener("change", updateDepthDescription);
+depthSlider.addEventListener("input", updateDepthDescription);
 explorerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const query = explorerQuery.value.trim();
@@ -810,7 +815,7 @@ lifeEventsNode.addEventListener("click", async (event) => {
 
   try {
     scopeSelect.value = preset.scope;
-    depthSelect.value = preset.depth_mode;
+    depthSlider.value = preset.depth_value;
     updateStateVisibility();
     updateDepthDescription();
 
@@ -824,7 +829,7 @@ lifeEventsNode.addEventListener("click", async (event) => {
       scope: preset.scope,
       state_code: stateSelect.value || null,
       categories: preset.categories,
-      depth_mode: preset.depth_mode,
+      depth_value: preset.depth_value,
     };
 
     if (payload.scope !== "federal" && !payload.state_code) {

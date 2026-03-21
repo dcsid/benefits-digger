@@ -43,11 +43,13 @@
 
           <label>
             Depth
-            <select id="depth-mode" name="depth_mode">
-              <option value="quick">Quick check</option>
-              <option value="standard" selected>Standard check</option>
-              <option value="deep">Deep check</option>
-            </select>
+            <input type="range" id="depth-slider" name="depth_value"
+                   min="0" max="1" step="0.01" value="0.5" />
+            <div class="depth-labels">
+              <span>Quick</span>
+              <span>Standard</span>
+              <span>Deep</span>
+            </div>
           </label>
           <p id="depth-description" class="meta">
             Standard asks a balanced number of questions and starts pulling in more detailed follow-ups after the basics.

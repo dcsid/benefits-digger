@@ -230,3 +230,157 @@ STATE_DIRECTORY_SAMPLE = [
     {"code": "NY", "name": "New York", "url": "https://www.ny.gov/"},
     {"code": "TX", "name": "Texas", "url": "https://www.hhs.texas.gov/"},
 ]
+
+
+# ---------------------------------------------------------------------------
+# Depth-dependent question variants
+# ---------------------------------------------------------------------------
+# Each entry overrides how a question is presented at a given depth tier.
+# Questions without a variant for the active tier fall back to the base
+# Question row (backward-compatible).  The "normalizer" field names a
+# function in app.normalizers that converts the detailed answer to the
+# canonical Yes/No format that eligibility rules already expect.
+# ---------------------------------------------------------------------------
+
+QUESTION_VARIANTS = [
+    # ── applicant_income ──────────────────────────────────────────────
+    {
+        "question_key": "applicant_income",
+        "depth_tier": "simple",
+        "prompt": "Do you have limited income and resources?",
+        "hint": "Answer yes if your household struggles to cover basic needs.",
+        "input_type": "radio",
+        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
+        "normalizer": None,
+    },
+    {
+        "question_key": "applicant_income",
+        "depth_tier": "detailed",
+        "prompt": "What is your approximate annual household income?",
+        "hint": "For reference, the 2024 federal poverty level is $15,060/year for a single-person household. Many programs use 130–200% of this threshold.",
+        "input_type": "currency",
+        "options": None,
+        "normalizer": "yes_if_below_fpl",
+    },
+    # ── applicant_disability ──────────────────────────────────────────
+    {
+        "question_key": "applicant_disability",
+        "depth_tier": "simple",
+        "prompt": "Do you have a disability or qualifying illness?",
+        "hint": None,
+        "input_type": "radio",
+        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
+        "normalizer": None,
+    },
+    {
+        "question_key": "applicant_disability",
+        "depth_tier": "detailed",
+        "prompt": "What type of disability or condition do you have?",
+        "hint": "Select all that apply. Under SSA rules, a qualifying disability must significantly limit your ability to perform basic work activities.",
+        "input_type": "select",
+        "options": [
+            {"label": "Physical disability", "value": "physical"},
+            {"label": "Cognitive or intellectual disability", "value": "cognitive"},
+            {"label": "Sensory disability (vision/hearing)", "value": "sensory"},
+            {"label": "Mental health condition", "value": "mental_health"},
+            {"label": "Chronic illness", "value": "chronic_illness"},
+            {"label": "None of the above", "value": "none"},
+        ],
+        "normalizer": "yes_if_any_selected",
+    },
+    # ── applicant_ability_to_work ─────────────────────────────────────
+    {
+        "question_key": "applicant_ability_to_work",
+        "depth_tier": "simple",
+        "prompt": "Are you unable to work for a year or more because of your disability?",
+        "hint": None,
+        "input_type": "radio",
+        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
+        "normalizer": None,
+    },
+    {
+        "question_key": "applicant_ability_to_work",
+        "depth_tier": "detailed",
+        "prompt": "How many months has your condition prevented you from working?",
+        "hint": "SSDI requires inability to engage in substantial gainful activity for at least 12 consecutive months (42 U.S.C. § 423(d)(1)(A)).",
+        "input_type": "number",
+        "options": None,
+        "normalizer": "yes_if_gte_12",
+    },
+    # ── applicant_date_of_birth ───────────────────────────────────────
+    {
+        "question_key": "applicant_date_of_birth",
+        "depth_tier": "simple",
+        "prompt": "What is your approximate age?",
+        "hint": "A rough age is enough for a quick check.",
+        "input_type": "number",
+        "options": None,
+        "normalizer": None,
+    },
+    {
+        "question_key": "applicant_date_of_birth",
+        "depth_tier": "detailed",
+        "prompt": "What is your exact date of birth?",
+        "hint": "Full retirement age varies: 66 for those born 1943–1954, increasing to 67 for those born 1960 or later (42 U.S.C. § 416(l)).",
+        "input_type": "date",
+        "options": None,
+        "normalizer": None,
+    },
+    # ── applicant_served_in_active_military ────────────────────────────
+    {
+        "question_key": "applicant_served_in_active_military",
+        "depth_tier": "simple",
+        "prompt": "Are you a military veteran?",
+        "hint": None,
+        "input_type": "radio",
+        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
+        "normalizer": None,
+    },
+    {
+        "question_key": "applicant_served_in_active_military",
+        "depth_tier": "detailed",
+        "prompt": "Did you serve in the active military, naval, or air service?",
+        "hint": "VA benefits require active duty service. Reserve/National Guard service may qualify if activated under federal orders (38 U.S.C. § 101(2)).",
+        "input_type": "radio",
+        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
+        "normalizer": None,
+    },
+    # ── applicant_service_disability ──────────────────────────────────
+    {
+        "question_key": "applicant_service_disability",
+        "depth_tier": "simple",
+        "prompt": "Was your disability related to military service?",
+        "hint": None,
+        "input_type": "radio",
+        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
+        "normalizer": None,
+    },
+    {
+        "question_key": "applicant_service_disability",
+        "depth_tier": "detailed",
+        "prompt": "Was your disability caused or made worse by your active-duty military service?",
+        "hint": "VA disability compensation requires a service-connected condition with a disability rating of at least 10% (38 U.S.C. § 1110).",
+        "input_type": "radio",
+        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
+        "normalizer": None,
+    },
+    # ── applicant_dolo (death of loved one) ───────────────────────────
+    {
+        "question_key": "applicant_dolo",
+        "depth_tier": "simple",
+        "prompt": "Did you recently lose a family member?",
+        "hint": None,
+        "input_type": "radio",
+        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
+        "normalizer": None,
+    },
+    {
+        "question_key": "applicant_dolo",
+        "depth_tier": "detailed",
+        "prompt": "Did you recently experience the death of an immediate family member?",
+        "hint": "Survivor benefits eligibility depends on your relationship to the deceased and their work history (42 U.S.C. § 402).",
+        "input_type": "radio",
+        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
+        "normalizer": None,
+    },
+]
