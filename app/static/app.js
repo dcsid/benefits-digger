@@ -54,6 +54,63 @@ const scenarioPresets = [
   },
 ];
 
+const lifeEventPresets = [
+  {
+    icon: "briefcase",
+    title: "I just lost my job",
+    description: "Unemployment, food assistance, and emergency help",
+    scope: "both",
+    depth_mode: "standard",
+    categories: ["jobs_unemployment", "food", "welfare_cash_assistance", "housing_utilities"],
+    prefilled_answers: {},
+  },
+  {
+    icon: "heart",
+    title: "A family member passed away",
+    description: "Survivor benefits, funeral assistance, and support",
+    scope: "both",
+    depth_mode: "standard",
+    categories: ["death", "welfare_cash_assistance"],
+    prefilled_answers: { applicant_dolo: "Yes" },
+  },
+  {
+    icon: "clock",
+    title: "I'm turning 65",
+    description: "Retirement, Medicare, Social Security, and senior programs",
+    scope: "both",
+    depth_mode: "standard",
+    categories: ["retirement_seniors", "health"],
+    prefilled_answers: {},
+  },
+  {
+    icon: "baby",
+    title: "I had a baby",
+    description: "Family benefits, child care, WIC, and health coverage",
+    scope: "both",
+    depth_mode: "standard",
+    categories: ["children_families", "health", "food"],
+    prefilled_answers: {},
+  },
+  {
+    icon: "shield",
+    title: "I became disabled",
+    description: "Disability benefits, SSI, SSDI, and medical assistance",
+    scope: "both",
+    depth_mode: "deep",
+    categories: ["disabilities", "health", "welfare_cash_assistance"],
+    prefilled_answers: { applicant_disability: "Yes" },
+  },
+  {
+    icon: "star",
+    title: "I served in the military",
+    description: "Veterans benefits, pensions, VA health care",
+    scope: "both",
+    depth_mode: "deep",
+    categories: ["military_veterans", "health", "housing_utilities"],
+    prefilled_answers: { applicant_served_in_active_military: "Yes" },
+  },
+];
+
 const scopeSelect = document.querySelector("#scope");
 const stateSelect = document.querySelector("#state-code");
 const depthSelect = document.querySelector("#depth-mode");
@@ -82,6 +139,34 @@ const scenarioResults = document.querySelector("#scenario-results");
 const explorerForm = document.querySelector("#explorer-form");
 const explorerQuery = document.querySelector("#explorer-query");
 const explorerResults = document.querySelector("#explorer-results");
+
+function escapeHtml(str) {
+  if (str == null) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function setLoading(el, isLoading) {
+  if (isLoading) {
+    el.classList.add("loading");
+    if (el.tagName === "BUTTON") el.disabled = true;
+  } else {
+    el.classList.remove("loading");
+    if (el.tagName === "BUTTON") el.disabled = false;
+  }
+}
+
+let debounceTimer = null;
+function debounce(fn, ms = 300) {
+  return (...args) => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => fn(...args), ms);
+  };
+}
 
 async function getJson(url, options = {}) {
   const response = await fetch(url, {
@@ -168,7 +253,7 @@ function renderQuestion(question) {
   questionEmpty.classList.add("hidden");
   questionForm.classList.remove("hidden");
 
-  const hint = question.hint ? `<p class="meta">${question.hint}</p>` : "";
+  const hint = question.hint ? `<p class="meta">${escapeHtml(question.hint)}</p>` : "";
   let inputMarkup = "";
 
   if (question.input_type === "radio" && question.options) {
@@ -202,10 +287,10 @@ function renderQuestion(question) {
   questionShell.innerHTML = `
     <div class="stack">
       <div>
-        <span class="pill">${question.sensitivity_level} sensitivity</span>
+        <span class="pill">${escapeHtml(question.sensitivity_level)} sensitivity</span>
       </div>
       <label>
-        <strong>${question.prompt}</strong>
+        <strong>${escapeHtml(question.prompt)}</strong>
         ${hint}
         ${inputMarkup}
       </label>
@@ -219,51 +304,62 @@ function statusLabel(status) {
 
 function renderResultCard(item) {
   const reasons = item.matched_reasons.length
-    ? `<ul class="reason-list">${item.matched_reasons.map((reason) => `<li>${reason}</li>`).join("")}</ul>`
+    ? `<ul class="reason-list">${item.matched_reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>`
     : "<p class='meta'>No matched reasons yet.</p>";
   const missing = item.missing_facts.length
-    ? `<ul class="reason-list">${item.missing_facts.map((fact) => `<li>${fact}</li>`).join("")}</ul>`
+    ? `<ul class="reason-list">${item.missing_facts.map((fact) => `<li>${escapeHtml(fact)}</li>`).join("")}</ul>`
     : "<p class='meta'>No missing facts for this current pass.</p>";
   const dataSources = item.data_gathered_from.length
     ? `<ul class="source-list">${item.data_gathered_from
         .map(
           (source) =>
-            `<li><a href="${source.url}" target="_blank" rel="noreferrer">${source.title}</a>${
-              source.last_verified_at ? ` · verified ${source.last_verified_at}` : ""
+            `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.title)}</a>${
+              source.last_verified_at ? ` · verified ${escapeHtml(source.last_verified_at)}` : ""
             }</li>`,
         )
         .join("")}</ul>`
     : "<p class='meta'>No official government sources attached.</p>";
   const howToGet = item.how_to_get_benefit.length
     ? `<ul class="source-list">${item.how_to_get_benefit
-        .map((step) => `<li><a href="${step.url}" target="_blank" rel="noreferrer">${step.label}</a></li>`)
+        .map((step) => `<li><a href="${escapeHtml(step.url)}" target="_blank" rel="noreferrer">${escapeHtml(step.label)}</a></li>`)
         .join("")}</ul>`
     : "<p class='meta'>No official application path is available for this result yet.</p>";
   const applicationLink = item.apply_url
-    ? `<a href="${item.apply_url}" target="_blank" rel="noreferrer">Open official government page</a>`
+    ? `<a href="${escapeHtml(item.apply_url)}" target="_blank" rel="noreferrer">Open official government page</a>`
     : "<span class='meta'>Use the official sources below.</span>";
+
+  const certainty = item.decision_certainty ?? 0;
+  const amountDisplay = item.estimated_amount?.display ?? "Not available";
 
   return `
     <article class="card">
       <header>
         <div>
-          <h3>${item.program_name}</h3>
-          <p class="meta">${item.agency || "Unknown agency"} · ${item.jurisdiction.name}</p>
+          <h3>${escapeHtml(item.program_name)}</h3>
+          <p class="meta">${escapeHtml(item.agency || "Unknown agency")} · ${escapeHtml(item.jurisdiction.name)}</p>
         </div>
-        <span class="badge ${item.eligibility_status}">${statusLabel(item.eligibility_status)}</span>
+        <span class="badge ${escapeHtml(item.eligibility_status)}">${statusLabel(item.eligibility_status)}</span>
       </header>
-      <p>${item.summary || "No summary available."}</p>
+      <p>${escapeHtml(item.summary || "No summary available.")}</p>
       <div class="stack">
         <div>
-          <div class="row spread">
-            <strong>Confidence</strong>
-            <span>${item.decision_certainty}/100</span>
+          <div class="row spread" style="cursor:pointer" onclick="this.parentElement.querySelector('.certainty-breakdown').classList.toggle('open')">
+            <strong>Confidence <span class="meta" style="font-weight:normal;font-size:0.82rem">(click to expand)</span></strong>
+            <span>${certainty}/100</span>
           </div>
-          <div class="meter"><span style="width: ${item.decision_certainty}%"></span></div>
+          <div class="meter"><span style="width: ${certainty}%"></span></div>
+          <div class="certainty-breakdown">
+            ${item.certainty_breakdown ? Object.entries(item.certainty_breakdown).map(([key, val]) => `
+              <div class="certainty-row">
+                <span>${escapeHtml(key.replace(/_/g, " "))}</span>
+                <div class="mini-meter"><span style="width: ${val ?? 0}%"></span></div>
+                <span>${val ?? 0}</span>
+              </div>
+            `).join("") : "<p class='meta'>No breakdown available.</p>"}
         </div>
         <div>
           <strong>Amount</strong>
-          <p class="meta">${item.estimated_amount.display}</p>
+          <p class="meta">${escapeHtml(amountDisplay)}</p>
         </div>
         <div>
           <strong>Why it matched</strong>
@@ -301,10 +397,10 @@ function renderResults(payload) {
   stateResults.classList.remove("empty");
   federalResults.innerHTML = payload.federal_results.length
     ? payload.federal_results.map(renderResultCard).join("")
-    : "No federal results for the current answers.";
+    : "<p class='meta'>No federal results yet. Answer more questions to improve matches.</p>";
   stateResults.innerHTML = payload.state_results.length
     ? payload.state_results.map(renderResultCard).join("")
-    : "No state results for the current answers.";
+    : "<p class='meta'>No state results yet. Answer more questions to improve matches.</p>";
 }
 
 function renderPlan(plan) {
@@ -343,9 +439,9 @@ function renderPlan(plan) {
         .map(
           (item) => `
             <article class="mini-card">
-              <h4>${item.label}</h4>
+              <h4>${escapeHtml(item.label)}</h4>
               <p class="meta">${item.likely_programs} likely · ${item.possible_programs} possible</p>
-              <p>${item.top_programs.join(", ") || "No top programs yet."}</p>
+              <p>${item.top_programs.map(escapeHtml).join(", ") || "No top programs yet."}</p>
             </article>
           `,
         )
@@ -357,7 +453,7 @@ function renderPlan(plan) {
         .map(
           (item) => `
             <article class="mini-card">
-              <h4>${item.label}</h4>
+              <h4>${escapeHtml(item.label)}</h4>
               <p class="meta">Affects ${item.program_count} program match${item.program_count === 1 ? "" : "es"}.</p>
             </article>
           `,
@@ -370,9 +466,9 @@ function renderPlan(plan) {
         .map(
           (step) => `
             <article class="mini-card">
-              <h4>${step.program_name}</h4>
+              <h4>${escapeHtml(step.program_name)}</h4>
               <p class="meta">${statusLabel(step.eligibility_status)} · confidence ${step.confidence}/100</p>
-              <p><a href="${step.url}" target="_blank" rel="noreferrer">${step.step_label}</a></p>
+              <p><a href="${escapeHtml(step.url)}" target="_blank" rel="noreferrer">${escapeHtml(step.step_label)}</a></p>
             </article>
           `,
         )
@@ -384,7 +480,7 @@ function renderPlan(plan) {
         .map(
           (item) => `
             <article class="mini-card">
-              <a href="${item.url}" target="_blank" rel="noreferrer">${item.label}</a>
+              <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.label)}</a>
             </article>
           `,
         )
@@ -393,7 +489,7 @@ function renderPlan(plan) {
 
   planningNotes.innerHTML = plan.planning_notes.length
     ? plan.planning_notes
-        .map((note) => `<article class="mini-card"><p>${note}</p></article>`)
+        .map((note) => `<article class="mini-card"><p>${escapeHtml(note)}</p></article>`)
         .join("")
     : "<p class='meta'>Planning notes will appear after your session has results.</p>";
 }
@@ -411,8 +507,8 @@ function renderScenarioComparison(payload) {
         <article class="card">
           <header>
             <div>
-              <h3>${comparison.name}</h3>
-              <p class="meta">${comparison.description || "Scenario comparison"}</p>
+              <h3>${escapeHtml(comparison.name)}</h3>
+              <p class="meta">${escapeHtml(comparison.description || "Scenario comparison")}</p>
             </div>
           </header>
           <div class="metric-grid">
@@ -439,7 +535,7 @@ function renderScenarioComparison(payload) {
               ${
                 comparison.gained_programs.length
                   ? `<ul class="reason-list">${comparison.gained_programs
-                      .map((item) => `<li>${item.program_name} · ${statusLabel(item.after_status)}</li>`)
+                      .map((item) => `<li>${escapeHtml(item.program_name)} · ${statusLabel(item.after_status)}</li>`)
                       .join("")}</ul>`
                   : "<p class='meta'>No new positive matches in this scenario.</p>"
               }
@@ -449,7 +545,7 @@ function renderScenarioComparison(payload) {
               ${
                 comparison.improved_programs.length
                   ? `<ul class="reason-list">${comparison.improved_programs
-                      .map((item) => `<li>${item.program_name} · ${statusLabel(item.before_status)} to ${statusLabel(item.after_status)}</li>`)
+                      .map((item) => `<li>${escapeHtml(item.program_name)} · ${statusLabel(item.before_status)} to ${statusLabel(item.after_status)}</li>`)
                       .join("")}</ul>`
                   : "<p class='meta'>No status improvements in this scenario.</p>"
               }
@@ -468,18 +564,18 @@ function renderExplorer(programs) {
         .map(
           (program) => `
             <article class="mini-card explorer-item">
-              <h4>${program.name}</h4>
-              <p class="meta">${program.agency || "Unknown agency"} · ${program.jurisdiction.name}</p>
-              <p>${program.summary || "No summary available."}</p>
+              <h4>${escapeHtml(program.name)}</h4>
+              <p class="meta">${escapeHtml(program.agency || "Unknown agency")} · ${escapeHtml(program.jurisdiction.name)}</p>
+              <p>${escapeHtml(program.summary || "No summary available.")}</p>
               ${
                 program.apply_url
-                  ? `<p><a href="${program.apply_url}" target="_blank" rel="noreferrer">Open official government page</a></p>`
+                  ? `<p><a href="${escapeHtml(program.apply_url)}" target="_blank" rel="noreferrer">Open official government page</a></p>`
                   : ""
               }
               ${
                 program.data_gathered_from.length
                   ? `<ul class="source-list">${program.data_gathered_from
-                      .map((source) => `<li><a href="${source.url}" target="_blank" rel="noreferrer">${source.title}</a></li>`)
+                      .map((source) => `<li><a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.title)}</a></li>`)
                       .join("")}</ul>`
                   : ""
               }
@@ -487,7 +583,7 @@ function renderExplorer(programs) {
           `,
         )
         .join("")
-    : "No programs matched this search.";
+    : "<p class='meta'>No programs matched this search. Try broadening your query or categories.</p>";
 }
 
 function renderReviewTasks(tasks) {
@@ -498,11 +594,11 @@ function renderReviewTasks(tasks) {
           (task) => `
           <article class="task">
             <div class="row spread">
-              <strong>${task.source_title || "Source"}</strong>
-              <span class="pill">${task.status}</span>
+              <strong>${escapeHtml(task.source_title || "Source")}</strong>
+              <span class="pill">${escapeHtml(task.status)}</span>
             </div>
-            <p class="meta">${task.diff_type} · materiality ${task.materiality_score}</p>
-            <p><a href="${task.source_url}" target="_blank" rel="noreferrer">${task.source_url}</a></p>
+            <p class="meta">${escapeHtml(task.diff_type)} · materiality ${task.materiality_score}</p>
+            <p><a href="${escapeHtml(task.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(task.source_url)}</a></p>
           </article>
         `,
         )
@@ -558,12 +654,19 @@ async function runScenario(index) {
 
 startForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const submitBtn = startForm.querySelector("button[type='submit']");
+  if (submitBtn && submitBtn.disabled) return;
   try {
     const categories = selectedCategories();
     if (!categories.length) {
       setStatus("Select at least one category before applying your selections.");
       return;
     }
+    if (scopeSelect.value !== "federal" && !stateSelect.value) {
+      setStatus("Please select a state when using state or combined scope.");
+      return;
+    }
+    if (submitBtn) setLoading(submitBtn, true);
     setStatus("Creating session...");
     const payload = {
       scope: scopeSelect.value,
@@ -577,25 +680,28 @@ startForm.addEventListener("submit", async (event) => {
     });
     state.sessionId = session.session_id;
     renderQuestion(session.next_question);
-    await loadResults();
-    await loadPlan();
-    await loadExplorer();
+    await Promise.all([loadResults(), loadPlan(), loadExplorer()]);
     setStatus(`Session ${state.sessionId} is live.`);
   } catch (error) {
     setStatus(`Could not start session: ${error.message}`);
+  } finally {
+    if (submitBtn) setLoading(submitBtn, false);
   }
 });
 
 questionForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const submitBtn = questionForm.querySelector("button[type='submit']");
+  if (submitBtn && submitBtn.disabled) return;
   if (!state.sessionId || !state.currentQuestion) return;
   const formData = new FormData(questionForm);
   const value = formData.get("answer");
-  if (value === null || value === "") {
+  if (value === null || value.toString().trim() === "") {
     setStatus("Please choose an answer before continuing.");
     return;
   }
   try {
+    if (submitBtn) setLoading(submitBtn, true);
     const payload = await getJson(`/api/v1/sessions/${state.sessionId}/answers`, {
       method: "POST",
       body: JSON.stringify({
@@ -605,11 +711,12 @@ questionForm.addEventListener("submit", async (event) => {
       }),
     });
     renderQuestion(payload.next_question);
-    await loadResults();
-    await loadPlan();
+    await Promise.all([loadResults(), loadPlan()]);
     setStatus(`Saved answer for ${state.currentQuestion.key}.`);
   } catch (error) {
     setStatus(`Could not save answer: ${error.message}`);
+  } finally {
+    if (submitBtn) setLoading(submitBtn, false);
   }
 });
 
@@ -645,6 +752,11 @@ scopeSelect.addEventListener("change", updateStateVisibility);
 depthSelect.addEventListener("change", updateDepthDescription);
 explorerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const query = explorerQuery.value.trim();
+  if (query.length > 0 && query.length < 2) {
+    setStatus("Enter at least 2 characters to search.");
+    return;
+  }
   try {
     await loadExplorer();
   } catch (error) {
@@ -662,12 +774,104 @@ scenarioPresetsNode.addEventListener("click", async (event) => {
   }
 });
 
+const lifeEventsNode = document.querySelector("#life-events");
+
+const eventIcons = {
+  briefcase: "\uD83D\uDCBC",
+  heart: "\uD83D\uDDA4",
+  clock: "\u23F0",
+  baby: "\uD83D\uDC76",
+  shield: "\u267F",
+  star: "\u2B50",
+};
+
+function renderLifeEvents() {
+  lifeEventsNode.innerHTML = lifeEventPresets
+    .map(
+      (event, index) => `
+        <button type="button" class="life-event-card" data-life-event="${index}">
+          <span class="event-icon">${eventIcons[event.icon] || ""}</span>
+          <strong>${escapeHtml(event.title)}</strong>
+          <span class="meta">${escapeHtml(event.description)}</span>
+        </button>
+      `,
+    )
+    .join("");
+}
+
+lifeEventsNode.addEventListener("click", async (event) => {
+  const card = event.target.closest("[data-life-event]");
+  if (!card || card.disabled) return;
+  const preset = lifeEventPresets[card.dataset.lifeEvent];
+  if (!preset) return;
+
+  card.disabled = true;
+  setLoading(card, true);
+
+  try {
+    scopeSelect.value = preset.scope;
+    depthSelect.value = preset.depth_mode;
+    updateStateVisibility();
+    updateDepthDescription();
+
+    preset.categories.forEach((cat) => {
+      const checkbox = document.querySelector(`input[name="category"][value="${cat}"]`);
+      if (checkbox) checkbox.checked = true;
+    });
+
+    setStatus("Setting up your screening...");
+    const payload = {
+      scope: preset.scope,
+      state_code: stateSelect.value || null,
+      categories: preset.categories,
+      depth_mode: preset.depth_mode,
+    };
+
+    if (payload.scope !== "federal" && !payload.state_code) {
+      setLoading(card, false);
+      setStatus("Please select a state first, then click a life event.");
+      return;
+    }
+
+    const session = await getJson("/api/v1/sessions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    state.sessionId = session.session_id;
+
+    if (Object.keys(preset.prefilled_answers).length) {
+      const updated = await getJson(`/api/v1/sessions/${state.sessionId}/answers`, {
+        method: "POST",
+        body: JSON.stringify({ answers: preset.prefilled_answers }),
+      });
+      renderQuestion(updated.next_question);
+    } else {
+      renderQuestion(session.next_question);
+    }
+
+    await Promise.all([loadResults(), loadPlan(), loadExplorer()]);
+    setStatus(`Session started for "${preset.title}".`);
+  } catch (error) {
+    setStatus(`Could not start session: ${error.message}`);
+  } finally {
+    setLoading(card, false);
+  }
+});
+
+document.querySelector("#export-results").addEventListener("click", () => {
+  if (!state.sessionId) {
+    setStatus("Start a session first to export results.");
+    return;
+  }
+  window.print();
+});
+
+renderLifeEvents();
 renderCategories();
 renderScenarioPresets();
 loadStates()
   .then(async () => {
-    await loadReviewTasks();
-    await loadExplorer();
+    await Promise.all([loadReviewTasks(), loadExplorer()]);
   })
   .catch((error) => setStatus(error.message));
 updateStateVisibility();

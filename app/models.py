@@ -57,6 +57,8 @@ class Program(Base):
 
     jurisdiction: Mapped[Jurisdiction] = relationship()
     agency: Mapped[Optional[Agency]] = relationship()
+    versions: Mapped[list["ProgramVersion"]] = relationship(back_populates="program", cascade="all, delete-orphan")
+    sources: Mapped[list["Source"]] = relationship(back_populates="program", cascade="all, delete-orphan")
 
 
 class ProgramVersion(Base):
@@ -73,7 +75,9 @@ class ProgramVersion(Base):
     source_freshness_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
-    program: Mapped[Program] = relationship()
+    program: Mapped[Program] = relationship(back_populates="versions")
+    rules: Mapped[list["EligibilityRule"]] = relationship(back_populates="program_version", cascade="all, delete-orphan")
+    amount_rules: Mapped[list["AmountRule"]] = relationship(back_populates="program_version", cascade="all, delete-orphan")
 
 
 class Question(Base):
@@ -104,7 +108,7 @@ class EligibilityRule(Base):
     source_citation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
-    program_version: Mapped[ProgramVersion] = relationship()
+    program_version: Mapped[ProgramVersion] = relationship(back_populates="rules")
 
 
 class AmountRule(Base):
@@ -117,7 +121,7 @@ class AmountRule(Base):
     source_key: Mapped[str] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
-    program_version: Mapped[ProgramVersion] = relationship()
+    program_version: Mapped[ProgramVersion] = relationship(back_populates="amount_rules")
 
 
 class Source(Base):
@@ -136,8 +140,9 @@ class Source(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
-    program: Mapped[Optional[Program]] = relationship()
+    program: Mapped[Optional[Program]] = relationship(back_populates="sources")
     jurisdiction: Mapped[Optional[Jurisdiction]] = relationship()
+    snapshots: Mapped[list["SourceSnapshot"]] = relationship(back_populates="source", cascade="all, delete-orphan")
 
 
 class SourceSnapshot(Base):
@@ -151,7 +156,7 @@ class SourceSnapshot(Base):
     raw_excerpt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     extraction_status: Mapped[str] = mapped_column(String(32), default="parsed")
 
-    source: Mapped[Source] = relationship()
+    source: Mapped[Source] = relationship(back_populates="snapshots")
 
 
 class ChangeEvent(Base):
@@ -195,6 +200,8 @@ class ScreeningSession(Base):
     depth_mode: Mapped[str] = mapped_column(String(16), default="standard")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
+    answers: Mapped[list["SessionAnswer"]] = relationship(back_populates="session", cascade="all, delete-orphan")
+
 
 class SessionAnswer(Base):
     __tablename__ = "session_answers"
@@ -207,4 +214,4 @@ class SessionAnswer(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
-    session: Mapped[ScreeningSession] = relationship()
+    session: Mapped[ScreeningSession] = relationship(back_populates="answers")

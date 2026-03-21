@@ -32,7 +32,9 @@ def strip_html(text: Optional[str]) -> str:
 
 def slugify(text: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-    return slug or "item"
+    if not slug:
+        slug = "item-" + hashlib.md5(text.encode("utf-8")).hexdigest()[:8]
+    return slug
 
 
 def hash_content(content: Any) -> str:

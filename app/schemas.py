@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SessionCreatePayload(BaseModel):
@@ -10,6 +10,12 @@ class SessionCreatePayload(BaseModel):
     state_code: Optional[str] = None
     categories: list[str] = Field(default_factory=list)
     depth_mode: Literal["quick", "standard", "deep"] = "standard"
+
+    @model_validator(mode="after")
+    def _require_state_for_state_scope(self):
+        if self.scope in ("state", "both") and not self.state_code:
+            raise ValueError("state_code is required when scope is 'state' or 'both'")
+        return self
 
 
 class AnswerPayload(BaseModel):

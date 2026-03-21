@@ -16,6 +16,12 @@
         </p>
       </section>
 
+      <section class="panel wide" id="life-event-section">
+        <h2>What brings you here?</h2>
+        <p class="meta">Pick a life event and we'll tailor your screening automatically, or skip to manual setup below.</p>
+        <div id="life-events" class="life-event-grid"></div>
+      </section>
+
       <section class="panel">
         <h2>Start Screening</h2>
         <form id="start-form" class="stack">
@@ -117,7 +123,10 @@
       <section class="panel wide">
         <div class="row spread">
           <h2>Results</h2>
-          <span id="result-count" class="pill">0 live matches</span>
+          <div class="row">
+            <span id="result-count" class="pill">0 live matches</span>
+            <button type="button" id="export-results" class="ghost">Export Results</button>
+          </div>
         </div>
         <div class="results-grid">
           <div>

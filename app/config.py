@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     request_timeout_seconds: float = 20.0
     auto_sync_remote: bool = True
     max_results_per_section: int = 12
+    admin_key: str = ""
     static_dir: Path = BASE_DIR / "app" / "static"
 
     model_config = SettingsConfigDict(

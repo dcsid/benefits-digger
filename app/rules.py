@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from datetime import date, datetime
 from typing import Any, Optional
 
@@ -46,7 +47,7 @@ def compare_scalar(answer: Any, expected: Any) -> bool:
 
     if isinstance(expected, (int, float)):
         parsed = parse_number(answer)
-        return parsed is not None and parsed == float(expected)
+        return parsed is not None and math.isclose(parsed, float(expected), rel_tol=1e-9)
 
     if not isinstance(expected, str):
         return answer == expected
@@ -92,10 +93,12 @@ def evaluate_matches_any(answer: Any, expected_values: Optional[list[Any]]) -> s
 def score_status(outcomes: list[str]) -> str:
     if not outcomes:
         return "unclear"
-    if "fail" in outcomes:
+    if all(outcome == "fail" for outcome in outcomes):
         return "likely_ineligible"
     if all(outcome == "pass" for outcome in outcomes):
         return "likely_eligible"
+    if "fail" in outcomes and "pass" in outcomes:
+        return "possibly_eligible"
     if "pass" in outcomes or "unknown" in outcomes:
         return "possibly_eligible"
     return "unclear"

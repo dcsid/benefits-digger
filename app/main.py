@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -49,11 +49,18 @@ app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 app.mount("/static", StaticFiles(directory=settings.static_dir), name="static")
+
+
+def require_admin_key(x_admin_key: str = Header(default="")) -> None:
+    if not settings.admin_key:
+        return
+    if x_admin_key != settings.admin_key:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin key")
 
 
 @app.get("/", include_in_schema=False)
@@ -62,8 +69,13 @@ def index() -> FileResponse:
 
 
 @app.get("/health")
-def health_check() -> dict[str, str]:
-    return {"status": "ok"}
+def health_check(db: Session = Depends(get_db)) -> dict[str, str]:
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
+        return {"status": "ok"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")
 
 
 @app.get(f"{settings.api_v1_prefix}/jurisdictions/states")
@@ -177,12 +189,12 @@ def program_detail(slug: str, db: Session = Depends(get_db)) -> dict:
 
 
 @app.get(f"{settings.api_v1_prefix}/admin/review-tasks")
-def review_tasks(db: Session = Depends(get_db)) -> list[dict]:
+def review_tasks(db: Session = Depends(get_db), _auth: None = Depends(require_admin_key)) -> list[dict]:
     return list_review_tasks(db)
 
 
 @app.post(f"{settings.api_v1_prefix}/admin/sync")
-def admin_sync(db: Session = Depends(get_db)) -> dict:
+def admin_sync(db: Session = Depends(get_db), _auth: None = Depends(require_admin_key)) -> dict:
     summary = sync_remote_sources(db)
     summary["review_tasks"] = list_review_tasks(db)
     return summary

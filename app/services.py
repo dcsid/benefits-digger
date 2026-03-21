@@ -112,11 +112,15 @@ def sync_remote_sources(db: Session) -> dict[str, Any]:
     summary = {"federal": "skipped", "states": "skipped", "review_tasks_created": 0}
     federal_catalog = fetch_remote_federal_catalog(settings.request_timeout_seconds)
     state_catalog = fetch_remote_state_directory(settings.request_timeout_seconds)
-    summary["review_tasks_created"] += sync_federal_catalog(db, federal_catalog, source_mode="remote")
-    summary["federal"] = "synced"
-    summary["review_tasks_created"] += sync_state_directory(db, state_catalog, source_mode="remote")
-    summary["states"] = "synced"
-    db.commit()
+    try:
+        summary["review_tasks_created"] += sync_federal_catalog(db, federal_catalog, source_mode="remote")
+        summary["federal"] = "synced"
+        summary["review_tasks_created"] += sync_state_directory(db, state_catalog, source_mode="remote")
+        summary["states"] = "synced"
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     return summary
 
 
@@ -706,6 +710,8 @@ def evaluate_program(db: Session, program: Program, version: ProgramVersion, ans
     source_keys = {rule.source_key for rule in rules}
 
     for rule in rules:
+        if not isinstance(rule.expected_values_json, list):
+            continue
         answer_value = answers.get(rule.question_key)
         outcome = evaluate_matches_any(answer_value, rule.expected_values_json)
         outcomes.append(outcome)
@@ -720,7 +726,7 @@ def evaluate_program(db: Session, program: Program, version: ProgramVersion, ans
     if program.kind == "referral":
         state_code = answers.get("state_code")
         if state_code and state_code == program.jurisdiction.code:
-            eligibility_status = "possibly_eligible"
+            eligibility_status = "likely_eligible"
             matched_reasons = [f"This is the official {program.jurisdiction.name} state entry point for benefits."]
             failed_reasons = []
             missing_facts = []
@@ -943,15 +949,18 @@ def compute_source_authority_score(db: Session, source_keys: set[str]) -> int:
 def compute_source_freshness_score(db: Session, source_keys: set[str]) -> int:
     if not source_keys:
         return 40
-    latest_dates: list[datetime] = []
-    for source in db.scalars(select(Source).where(Source.key.in_(source_keys))).all():
-        snapshot = db.scalar(
-            select(SourceSnapshot)
-            .where(SourceSnapshot.source_id == source.id)
-            .order_by(desc(SourceSnapshot.fetched_at))
-        )
-        if snapshot:
-            latest_dates.append(snapshot.fetched_at)
+    from sqlalchemy import func as sa_func
+    latest_subq = (
+        select(SourceSnapshot.source_id, sa_func.max(SourceSnapshot.fetched_at).label("latest"))
+        .group_by(SourceSnapshot.source_id)
+        .subquery()
+    )
+    rows = db.execute(
+        select(latest_subq.c.latest)
+        .join(Source, Source.id == latest_subq.c.source_id)
+        .where(Source.key.in_(source_keys))
+    ).all()
+    latest_dates = [row[0] for row in rows if row[0]]
     if not latest_dates:
         return 60
     days_old = (datetime.utcnow() - max(latest_dates)).days
@@ -987,47 +996,57 @@ def compute_amount_determinism(amount_rule: Optional[AmountRule]) -> int:
 
 
 def get_program_sources(db: Session, program: Program) -> list[dict[str, Any]]:
+    from sqlalchemy import func as sa_func
+
     sources = db.scalars(select(Source).where(Source.program_id == program.id)).all()
+
+    all_source_ids = [s.id for s in sources]
+    shared_keys = []
+    if program.jurisdiction.level == "federal":
+        shared_keys.append("usagov-benefit-finder-feed")
+    elif program.jurisdiction.level == "state":
+        shared_keys.append("usagov-state-social-services-directory")
+    shared_sources = db.scalars(select(Source).where(Source.key.in_(shared_keys))).all() if shared_keys else []
+    all_source_ids.extend(s.id for s in shared_sources)
+
+    latest_subq = (
+        select(SourceSnapshot.source_id, sa_func.max(SourceSnapshot.fetched_at).label("latest"))
+        .where(SourceSnapshot.source_id.in_(all_source_ids))
+        .group_by(SourceSnapshot.source_id)
+        .subquery()
+    )
+    snapshot_map = {
+        row[0]: row[1]
+        for row in db.execute(select(latest_subq.c.source_id, latest_subq.c.latest)).all()
+    }
+
     payload = []
     for source in sources:
         if not is_official_government_url(source.url):
             continue
-        snapshot = db.scalar(
-            select(SourceSnapshot)
-            .where(SourceSnapshot.source_id == source.id)
-            .order_by(desc(SourceSnapshot.fetched_at))
-        )
+        fetched = snapshot_map.get(source.id)
         payload.append(
             {
                 "title": source.title,
                 "url": source.url,
                 "kind": "application_page",
                 "authority_rank": source.authority_rank,
-                "last_verified_at": snapshot.fetched_at.date().isoformat() if snapshot else None,
+                "last_verified_at": fetched.date().isoformat() if fetched else None,
             }
         )
-    for shared_key in {"usagov-benefit-finder-feed", "usagov-state-social-services-directory"}:
-        shared_source = db.scalar(select(Source).where(Source.key == shared_key))
-        if shared_source and (
-            (program.jurisdiction.level == "federal" and shared_key == "usagov-benefit-finder-feed")
-            or (program.jurisdiction.level == "state" and shared_key == "usagov-state-social-services-directory")
-        ):
-            if not is_official_government_url(shared_source.url):
-                continue
-            snapshot = db.scalar(
-                select(SourceSnapshot)
-                .where(SourceSnapshot.source_id == shared_source.id)
-                .order_by(desc(SourceSnapshot.fetched_at))
-            )
-            payload.append(
-                {
-                    "title": shared_source.title,
-                    "url": shared_source.url,
-                    "kind": "data_source",
-                    "authority_rank": shared_source.authority_rank,
-                    "last_verified_at": snapshot.fetched_at.date().isoformat() if snapshot else None,
-                }
-            )
+    for shared_source in shared_sources:
+        if not is_official_government_url(shared_source.url):
+            continue
+        fetched = snapshot_map.get(shared_source.id)
+        payload.append(
+            {
+                "title": shared_source.title,
+                "url": shared_source.url,
+                "kind": "data_source",
+                "authority_rank": shared_source.authority_rank,
+                "last_verified_at": fetched.date().isoformat() if fetched else None,
+            }
+        )
     return payload
 
 
