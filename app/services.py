@@ -8,11 +8,13 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.catalog import (
+    FEDERAL_FEED_PAGE_URL,
     build_fallback_federal_catalog,
     build_fallback_state_directory,
     fetch_remote_federal_catalog,
     fetch_remote_state_directory,
     hash_content,
+    is_official_government_url,
     slugify,
 )
 from app.config import get_settings
@@ -130,6 +132,7 @@ def sync_federal_catalog(db: Session, catalog: dict[str, Any], source_mode: str)
         slug = slugify(benefit["title"])
         seen_slugs.add(slug)
         agency = get_or_create_agency(db, federal.id, benefit["agency_title"], benefit.get("source_link"))
+        official_program_url = benefit.get("source_link") if is_official_government_url(benefit.get("source_link")) else FEDERAL_FEED_PAGE_URL
         program = db.scalar(select(Program).where(Program.slug == slug))
         if program is None:
             program = Program(
@@ -139,7 +142,7 @@ def sync_federal_catalog(db: Session, catalog: dict[str, Any], source_mode: str)
                 category=benefit["category"],
                 family=benefit["family"],
                 summary=benefit["summary"],
-                apply_url=benefit["source_link"],
+                apply_url=official_program_url,
                 status="active",
                 jurisdiction_id=federal.id,
                 agency_id=agency.id,
@@ -152,7 +155,7 @@ def sync_federal_catalog(db: Session, catalog: dict[str, Any], source_mode: str)
             program.category = benefit["category"]
             program.family = benefit["family"]
             program.summary = benefit["summary"]
-            program.apply_url = benefit["source_link"]
+            program.apply_url = official_program_url
             program.status = "active"
             program.agency_id = agency.id
 
@@ -160,7 +163,7 @@ def sync_federal_catalog(db: Session, catalog: dict[str, Any], source_mode: str)
             db,
             key=f"program-source:{slug}",
             title=benefit["title"],
-            url=benefit["source_link"],
+            url=official_program_url,
             source_type="program_page",
             authority_rank=80,
             parser_type="link",
@@ -172,7 +175,7 @@ def sync_federal_catalog(db: Session, catalog: dict[str, Any], source_mode: str)
         signature = hash_content(
             {
                 "summary": benefit["summary"],
-                "apply_url": benefit["source_link"],
+                "apply_url": official_program_url,
                 "eligibility": benefit["eligibility"],
                 "amount_display": benefit.get("amount_display"),
             }
@@ -202,7 +205,7 @@ def sync_federal_catalog(db: Session, catalog: dict[str, Any], source_mode: str)
                         label=row["label"],
                         priority=100,
                         source_key=source.key,
-                        source_citation=benefit["source_link"],
+                        source_citation=official_program_url,
                     )
                 )
 
@@ -474,6 +477,7 @@ def get_program_detail(db: Session, slug: str) -> Optional[dict[str, Any]]:
     if version is None:
         return None
     source_rows = get_program_sources(db, program)
+    how_to_get_benefit = build_application_guidance(program, source_rows)
     return {
         "slug": program.slug,
         "name": program.name,
@@ -497,6 +501,8 @@ def get_program_detail(db: Session, slug: str) -> Optional[dict[str, Any]]:
             }
             for rule in db.scalars(select(EligibilityRule).where(EligibilityRule.program_version_id == version.id)).all()
         ],
+        "data_gathered_from": source_rows,
+        "how_to_get_benefit": how_to_get_benefit,
         "sources": source_rows,
     }
 
@@ -579,6 +585,8 @@ def evaluate_program(db: Session, program: Program, version: ProgramVersion, ans
         + 0.15 * program_determinism
         + 0.10 * amount_determinism
     )
+    data_sources = get_program_sources(db, program)
+    how_to_get_benefit = build_application_guidance(program, data_sources)
 
     return {
         "program_slug": program.slug,
@@ -608,7 +616,9 @@ def evaluate_program(db: Session, program: Program, version: ProgramVersion, ans
         "matched_reasons": matched_reasons[:4],
         "missing_facts": missing_facts[:4],
         "failed_reasons": failed_reasons[:4],
-        "sources": get_program_sources(db, program),
+        "data_gathered_from": data_sources,
+        "how_to_get_benefit": how_to_get_benefit,
+        "sources": data_sources,
     }
 
 
@@ -764,6 +774,8 @@ def get_program_sources(db: Session, program: Program) -> list[dict[str, Any]]:
     sources = db.scalars(select(Source).where(Source.program_id == program.id)).all()
     payload = []
     for source in sources:
+        if not is_official_government_url(source.url):
+            continue
         snapshot = db.scalar(
             select(SourceSnapshot)
             .where(SourceSnapshot.source_id == source.id)
@@ -773,6 +785,7 @@ def get_program_sources(db: Session, program: Program) -> list[dict[str, Any]]:
             {
                 "title": source.title,
                 "url": source.url,
+                "kind": "application_page",
                 "authority_rank": source.authority_rank,
                 "last_verified_at": snapshot.fetched_at.date().isoformat() if snapshot else None,
             }
@@ -783,6 +796,8 @@ def get_program_sources(db: Session, program: Program) -> list[dict[str, Any]]:
             (program.jurisdiction.level == "federal" and shared_key == "usagov-benefit-finder-feed")
             or (program.jurisdiction.level == "state" and shared_key == "usagov-state-social-services-directory")
         ):
+            if not is_official_government_url(shared_source.url):
+                continue
             snapshot = db.scalar(
                 select(SourceSnapshot)
                 .where(SourceSnapshot.source_id == shared_source.id)
@@ -792,11 +807,74 @@ def get_program_sources(db: Session, program: Program) -> list[dict[str, Any]]:
                 {
                     "title": shared_source.title,
                     "url": shared_source.url,
+                    "kind": "data_source",
                     "authority_rank": shared_source.authority_rank,
                     "last_verified_at": snapshot.fetched_at.date().isoformat() if snapshot else None,
                 }
             )
     return payload
+
+
+def build_application_guidance(program: Program, data_sources: list[dict[str, Any]]) -> list[dict[str, str]]:
+    application_url = get_official_application_url(program, data_sources)
+    steps: list[dict[str, str]] = []
+
+    if program.kind == "referral":
+        if application_url:
+            steps.append(
+                {
+                    "label": "Start on the official state social services website.",
+                    "url": application_url,
+                }
+            )
+            steps.append(
+                {
+                    "label": "Use the state's official benefit tools or program pages to choose the benefit you need.",
+                    "url": application_url,
+                }
+            )
+            steps.append(
+                {
+                    "label": "Follow the state's official instructions for documents, local office contact, or online submission.",
+                    "url": application_url,
+                }
+            )
+        return steps
+
+    overview_source = next((source for source in data_sources if source.get("kind") == "data_source"), None)
+    if overview_source:
+        steps.append(
+            {
+                "label": "Review the official government eligibility source used for this match.",
+                "url": overview_source["url"],
+            }
+        )
+    if application_url:
+        steps.append(
+            {
+                "label": "Open the official government page to start or continue the application.",
+                "url": application_url,
+            }
+        )
+        steps.append(
+            {
+                "label": "Use the same official page for required documents, status checks, or agency contact details.",
+                "url": application_url,
+            }
+        )
+    return steps
+
+
+def get_official_application_url(program: Program, data_sources: list[dict[str, Any]]) -> Optional[str]:
+    if is_official_government_url(program.apply_url):
+        return program.apply_url
+    application_source = next((source for source in data_sources if source.get("kind") == "application_page"), None)
+    if application_source:
+        return application_source["url"]
+    data_source = next((source for source in data_sources if source.get("kind") == "data_source"), None)
+    if data_source:
+        return data_source["url"]
+    return None
 
 
 def ensure_base_questions(db: Session) -> None:

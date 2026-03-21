@@ -156,8 +156,8 @@ function renderResultCard(item) {
   const missing = item.missing_facts.length
     ? `<ul class="reason-list">${item.missing_facts.map((fact) => `<li>${fact}</li>`).join("")}</ul>`
     : "<p class='meta'>No missing facts for this current pass.</p>";
-  const sources = item.sources.length
-    ? `<ul class="source-list">${item.sources
+  const dataSources = item.data_gathered_from.length
+    ? `<ul class="source-list">${item.data_gathered_from
         .map(
           (source) =>
             `<li><a href="${source.url}" target="_blank" rel="noreferrer">${source.title}</a>${
@@ -165,7 +165,15 @@ function renderResultCard(item) {
             }</li>`,
         )
         .join("")}</ul>`
-    : "<p class='meta'>No sources attached.</p>";
+    : "<p class='meta'>No official government sources attached.</p>";
+  const howToGet = item.how_to_get_benefit.length
+    ? `<ul class="source-list">${item.how_to_get_benefit
+        .map((step) => `<li><a href="${step.url}" target="_blank" rel="noreferrer">${step.label}</a></li>`)
+        .join("")}</ul>`
+    : "<p class='meta'>No official application path is available for this result yet.</p>";
+  const applicationLink = item.apply_url
+    ? `<a href="${item.apply_url}" target="_blank" rel="noreferrer">Open official government page</a>`
+    : "<span class='meta'>Use the official sources below.</span>";
 
   return `
     <article class="card">
@@ -198,11 +206,17 @@ function renderResultCard(item) {
           ${missing}
         </div>
         <div>
-          <strong>Sources</strong>
-          ${sources}
+          <strong>Data gathered from official government websites</strong>
+          ${dataSources}
         </div>
         <div class="row">
-          <a href="${item.apply_url}" target="_blank" rel="noreferrer">Open application page</a>
+          <strong>How to get this benefit</strong>
+        </div>
+        <div>
+          ${howToGet}
+        </div>
+        <div class="row">
+          ${applicationLink}
         </div>
       </div>
     </article>

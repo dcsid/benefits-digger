@@ -5,6 +5,7 @@ import html
 import json
 import re
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import httpx
 
@@ -13,6 +14,7 @@ from app.seed_data import FEDERAL_SAMPLE_BENEFITS, FEDERAL_SAMPLE_QUESTIONS, STA
 
 FEDERAL_FEED_URL = "https://www.usa.gov/s3/files/benefit-finder/api/life-event/all_benefits.json"
 STATE_DIRECTORY_URL = "https://www.usa.gov/state-social-services"
+FEDERAL_FEED_PAGE_URL = "https://www.usa.gov/benefit-finder/all-benefits"
 TAG_RE = re.compile(r"<[^>]+>")
 WHITESPACE_RE = re.compile(r"\s+")
 STATE_LINK_RE = re.compile(
@@ -37,6 +39,16 @@ def hash_content(content: Any) -> str:
     if not isinstance(content, str):
         content = json.dumps(content, sort_keys=True)
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def is_official_government_url(url: Optional[str]) -> bool:
+    if not url:
+        return False
+    parsed = urlparse(url)
+    host = (parsed.netloc or "").lower().split(":")[0]
+    if parsed.scheme not in {"http", "https"} or not host:
+        return False
+    return host.endswith(".gov") or host.endswith(".mil") or host.endswith(".us") or host in {"usa.gov", "www.usa.gov"}
 
 
 def infer_category(text: str) -> str:
@@ -125,12 +137,14 @@ def normalize_remote_federal_payload(payload_text: str) -> dict[str, Any]:
         benefit = item["benefit"]
         summary = strip_html(benefit.get("summary"))
         title = strip_html(benefit.get("title"))
+        source_link = benefit.get("SourceLink")
+        official_source_link = source_link if is_official_government_url(source_link) else FEDERAL_FEED_PAGE_URL
         normalized_benefits.append(
             {
                 "title": title,
                 "summary": summary,
                 "agency_title": strip_html(benefit.get("agency", {}).get("title")),
-                "source_link": benefit.get("SourceLink"),
+                "source_link": official_source_link,
                 "category": infer_category(f"{title} {summary}"),
                 "family": slugify(title),
                 "eligibility": [
@@ -161,12 +175,15 @@ def parse_state_directory_html(payload_text: str) -> dict[str, Any]:
         code = match.group("code").upper()
         if code in seen_codes:
             continue
+        href = match.group("href")
+        if not is_official_government_url(href):
+            continue
         name = html.unescape(match.group("label")).strip()
         agencies.append(
             {
                 "code": code,
                 "name": name,
-                "url": match.group("href"),
+                "url": href,
             }
         )
         seen_codes.add(code)

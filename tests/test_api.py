@@ -58,5 +58,8 @@ def test_session_flow_returns_federal_and_state_results() -> None:
             item for item in payload["federal_results"] if item["program_slug"] == "social-security-retirement-benefits"
         )
         assert retirement["eligibility_status"] in {"likely_eligible", "possibly_eligible"}
+        assert retirement["data_gathered_from"]
+        assert retirement["how_to_get_benefit"]
+        assert all(".gov" in source["url"] or ".us" in source["url"] for source in retirement["data_gathered_from"])
+        assert all(".gov" in step["url"] or ".us" in step["url"] for step in retirement["how_to_get_benefit"])
         assert payload["state_results"][0]["jurisdiction"]["code"] == "NY"
-

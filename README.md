@@ -9,6 +9,7 @@ It includes:
 - state social-service directory ingestion for state entry points
 - a browser UI for session creation, adaptive questions, and result review
 - a remote sync endpoint that pulls the official USA.gov benefit feed and state directory
+- official-government links only in the displayed sources and application paths
 
 ## What It Does Today
 
@@ -17,6 +18,7 @@ It includes:
 - Separates federal results from state results.
 - Uses explainable confidence factors instead of a single arbitrary confidence guess.
 - Creates review tasks when the official source snapshots change.
+- Shows where the data was gathered from and how to get the benefit using official government pages only.
 
 ## Current Scope
 
