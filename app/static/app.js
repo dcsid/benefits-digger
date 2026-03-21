@@ -17,10 +17,19 @@ const categoryDefinitions = [
   { value: "retirement_seniors", label: "Retirement and seniors" },
   { value: "welfare_cash_assistance", label: "Welfare and cash assistance" },
 ];
+const depthDescriptions = {
+  quick:
+    "Quick asks fewer questions, avoids aggressive follow-ups for as long as it can, and stops early once it has a light screen.",
+  standard:
+    "Standard asks a balanced number of questions and starts pulling in more detailed follow-ups after the basics.",
+  deep:
+    "Deep is more aggressive: it keeps going longer and starts medium and high-sensitivity follow-ups much earlier to tighten the match.",
+};
 
 const scopeSelect = document.querySelector("#scope");
 const stateSelect = document.querySelector("#state-code");
 const depthSelect = document.querySelector("#depth-mode");
+const depthDescription = document.querySelector("#depth-description");
 const startForm = document.querySelector("#start-form");
 const questionForm = document.querySelector("#question-form");
 const questionShell = document.querySelector("#question-shell");
@@ -67,6 +76,10 @@ function selectedCategories() {
 function updateStateVisibility() {
   const scope = scopeSelect.value;
   stateSelect.closest("label").style.display = scope === "federal" ? "none" : "grid";
+}
+
+function updateDepthDescription() {
+  depthDescription.textContent = depthDescriptions[depthSelect.value] || depthDescriptions.standard;
 }
 
 function renderCategories() {
@@ -349,7 +362,9 @@ document.querySelector("#refresh-review").addEventListener("click", loadReviewTa
 document.querySelector("#select-all-categories").addEventListener("click", () => setAllCategories(true));
 document.querySelector("#clear-categories").addEventListener("click", () => setAllCategories(false));
 scopeSelect.addEventListener("change", updateStateVisibility);
+depthSelect.addEventListener("change", updateDepthDescription);
 
 renderCategories();
 loadStates().then(loadReviewTasks).catch((error) => setStatus(error.message));
 updateStateVisibility();
+updateDepthDescription();

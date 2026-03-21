@@ -63,3 +63,47 @@ def test_session_flow_returns_federal_and_state_results() -> None:
         assert all(".gov" in source["url"] or ".us" in source["url"] for source in retirement["data_gathered_from"])
         assert all(".gov" in step["url"] or ".us" in step["url"] for step in retirement["how_to_get_benefit"])
         assert payload["state_results"][0]["jurisdiction"]["code"] == "NY"
+
+
+def test_deep_mode_is_more_aggressive_than_quick() -> None:
+    with TestClient(app) as client:
+        quick_response = client.post(
+            "/api/v1/sessions",
+            json={
+                "scope": "federal",
+                "categories": ["all"],
+                "depth_mode": "quick",
+            },
+        )
+        deep_response = client.post(
+            "/api/v1/sessions",
+            json={
+                "scope": "federal",
+                "categories": ["all"],
+                "depth_mode": "deep",
+            },
+        )
+
+        assert quick_response.status_code == 200
+        assert deep_response.status_code == 200
+
+        seeded_answers = {
+            "applicant_paid_into_SS": "Yes",
+            "applicant_disability": "No",
+            "applicant_served_in_active_military": "No",
+            "applicant_dolo": "No",
+        }
+
+        quick_follow_up = client.post(
+            f"/api/v1/sessions/{quick_response.json()['session_id']}/answers",
+            json={"answers": seeded_answers},
+        )
+        deep_follow_up = client.post(
+            f"/api/v1/sessions/{deep_response.json()['session_id']}/answers",
+            json={"answers": seeded_answers},
+        )
+
+        assert quick_follow_up.status_code == 200
+        assert deep_follow_up.status_code == 200
+        assert quick_follow_up.json()["next_question"] is None
+        assert deep_follow_up.json()["next_question"] is not None

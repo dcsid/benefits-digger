@@ -38,11 +38,25 @@ from app.rules import evaluate_matches_any, score_status
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-DEPTH_LIMITS = {"quick": 6, "standard": 12, "deep": 20}
-DEPTH_WEIGHTS = {
-    "quick": {"low": 1.0, "medium": 0.7, "high": 0.3},
-    "standard": {"low": 1.0, "medium": 0.9, "high": 0.7},
-    "deep": {"low": 1.0, "medium": 1.0, "high": 1.0},
+DEPTH_POLICIES = {
+    "quick": {
+        "max_answers": 4,
+        "weights": {"low": 1.0, "medium": 0.25, "high": 0.05},
+        "bonuses": {"low": 25, "medium": -20, "high": -160},
+        "unlock_after": {"low": 0, "medium": 1, "high": 99},
+    },
+    "standard": {
+        "max_answers": 10,
+        "weights": {"low": 1.0, "medium": 0.95, "high": 0.45},
+        "bonuses": {"low": 10, "medium": 10, "high": -15},
+        "unlock_after": {"low": 0, "medium": 0, "high": 3},
+    },
+    "deep": {
+        "max_answers": 24,
+        "weights": {"low": 1.0, "medium": 1.35, "high": 1.9},
+        "bonuses": {"low": 0, "medium": 35, "high": 90},
+        "unlock_after": {"low": 0, "medium": 0, "high": 1},
+    },
 }
 CATEGORY_FILTER_MAP = {
     "children_families": {"children_families", "family"},
@@ -401,34 +415,16 @@ def get_answers_map(db: Session, session: ScreeningSession) -> dict[str, Any]:
 
 
 def get_next_question(db: Session, session: ScreeningSession, answers: dict[str, Any]) -> Optional[Question]:
+    policy = get_depth_policy(session.depth_mode)
     if session.scope in {"state", "both"} and not session.state_code and "state_code" not in answers:
         return db.scalar(select(Question).where(Question.key == "state_code"))
 
-    if len(answers) >= DEPTH_LIMITS.get(session.depth_mode, 12):
+    if len(answers) >= policy["max_answers"]:
         return None
 
-    scores: dict[str, float] = {}
-    candidate_programs = get_candidate_programs(db, session)
-    for program in candidate_programs:
-        version = get_latest_version(db, program.id)
-        if version is None:
-            continue
-        rules = db.scalars(
-            select(EligibilityRule)
-            .where(EligibilityRule.program_version_id == version.id)
-            .order_by(desc(EligibilityRule.priority))
-        ).all()
-        for rule in rules:
-            if rule.question_key in answers:
-                continue
-            question = db.scalar(select(Question).where(Question.key == rule.question_key))
-            if question is None:
-                continue
-            depth_weight = DEPTH_WEIGHTS.get(session.depth_mode, DEPTH_WEIGHTS["standard"]).get(
-                question.sensitivity_level,
-                1.0,
-            )
-            scores[rule.question_key] = scores.get(rule.question_key, 0.0) + rule.priority * depth_weight + question.sort_weight
+    scores = score_unanswered_questions(db, session, answers, enforce_depth_unlocks=True)
+    if not scores:
+        scores = score_unanswered_questions(db, session, answers, enforce_depth_unlocks=False)
 
     if not scores:
         return None
@@ -650,6 +646,54 @@ def result_sort_key(result: dict[str, Any]) -> tuple[int, int]:
         "likely_ineligible": 0,
     }
     return status_rank.get(result["eligibility_status"], 0), result["decision_certainty"]
+
+
+def get_depth_policy(depth_mode: str) -> dict[str, Any]:
+    return DEPTH_POLICIES.get(depth_mode, DEPTH_POLICIES["standard"])
+
+
+def question_is_unlocked(question: Question, answers_count: int, policy: dict[str, Any]) -> bool:
+    unlock_after = policy["unlock_after"].get(question.sensitivity_level, 0)
+    return answers_count >= unlock_after
+
+
+def score_unanswered_questions(
+    db: Session,
+    session: ScreeningSession,
+    answers: dict[str, Any],
+    *,
+    enforce_depth_unlocks: bool,
+) -> dict[str, float]:
+    policy = get_depth_policy(session.depth_mode)
+    scores: dict[str, float] = {}
+    candidate_programs = get_candidate_programs(db, session)
+    answers_count = len(answers)
+    for program in candidate_programs:
+        version = get_latest_version(db, program.id)
+        if version is None:
+            continue
+        rules = db.scalars(
+            select(EligibilityRule)
+            .where(EligibilityRule.program_version_id == version.id)
+            .order_by(desc(EligibilityRule.priority))
+        ).all()
+        for rule in rules:
+            if rule.question_key in answers:
+                continue
+            question = db.scalar(select(Question).where(Question.key == rule.question_key))
+            if question is None:
+                continue
+            if enforce_depth_unlocks and not question_is_unlocked(question, answers_count, policy):
+                continue
+            depth_weight = policy["weights"].get(question.sensitivity_level, 1.0)
+            sensitivity_bonus = policy["bonuses"].get(question.sensitivity_level, 0)
+            scores[rule.question_key] = (
+                scores.get(rule.question_key, 0.0)
+                + rule.priority * depth_weight
+                + question.sort_weight
+                + sensitivity_bonus
+            )
+    return scores
 
 
 def expand_category_filters(categories: set[str]) -> set[str]:
