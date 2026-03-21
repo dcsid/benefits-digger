@@ -2,6 +2,8 @@ const state = {
   sessionId: null,
   currentQuestion: null,
   latestPlan: null,
+  activeScope: null,
+  isScreeningFinished: false,
 };
 
 const categoryDefinitions = [
@@ -110,6 +112,8 @@ const lifeEventPresets = [
 
 const scopeSelect = document.querySelector("#scope");
 const stateSelect = document.querySelector("#state-code");
+const stateValidation = document.querySelector("#state-validation");
+const startScreeningPanel = document.querySelector("#start-screening-panel");
 const depthSlider = document.querySelector("#depth-slider");
 const depthDescription = document.querySelector("#depth-description");
 const startForm = document.querySelector("#start-form");
@@ -117,6 +121,9 @@ const questionForm = document.querySelector("#question-form");
 const questionShell = document.querySelector("#question-shell");
 const questionEmpty = document.querySelector("#question-empty");
 const resultCount = document.querySelector("#result-count");
+const resultsSection = document.querySelector("#results-section");
+const resultsGrid = document.querySelector("#results-grid");
+const stateResultsColumn = document.querySelector("#state-results-column");
 const federalResults = document.querySelector("#federal-results");
 const stateResults = document.querySelector("#state-results");
 const statusNode = document.querySelector("#status");
@@ -124,6 +131,7 @@ const reviewTasks = document.querySelector("#review-tasks");
 const categoryList = document.querySelector("#category-list");
 const planShell = document.querySelector("#plan-shell");
 const planEmpty = document.querySelector("#plan-empty");
+const planEmptyCta = document.querySelector("#plan-empty-cta");
 const planDepthPill = document.querySelector("#plan-depth-pill");
 const overviewMetrics = document.querySelector("#overview-metrics");
 const benefitStack = document.querySelector("#benefit-stack");
@@ -145,6 +153,11 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function setBusyButtonText(button, isBusy, busyText, idleText) {
+  if (!button) return;
+  button.textContent = isBusy ? busyText : idleText;
 }
 
 function setLoading(el, isLoading) {
@@ -181,6 +194,38 @@ function setStatus(message) {
   statusNode.textContent = message;
 }
 
+function setStateValidation(message = "") {
+  if (!stateValidation || !stateSelect) return;
+  if (!message) {
+    stateValidation.textContent = "";
+    stateValidation.classList.add("hidden");
+    stateSelect.classList.remove("input-error");
+    stateSelect.removeAttribute("aria-invalid");
+    return;
+  }
+
+  stateValidation.textContent = message;
+  stateValidation.classList.remove("hidden");
+  stateSelect.classList.add("input-error");
+  stateSelect.setAttribute("aria-invalid", "true");
+}
+
+function scrollToTopOf(node) {
+  if (!node) return;
+  const top = node.getBoundingClientRect().top + window.scrollY - 8;
+  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+}
+
+function isFederalOnlyScope() {
+  return state.activeScope === "federal";
+}
+
+function updateResultsLayout() {
+  const federalOnly = isFederalOnlyScope();
+  if (stateResultsColumn) stateResultsColumn.classList.toggle("hidden", federalOnly);
+  if (resultsGrid) resultsGrid.classList.toggle("single-column", federalOnly);
+}
+
 async function loadStates() {
   const states = await getJson("/api/v1/jurisdictions/states");
   stateSelect.innerHTML = '<option value="">Choose a state</option>';
@@ -200,6 +245,7 @@ function selectedCategories() {
 function updateStateVisibility() {
   const scope = scopeSelect.value;
   stateSelect.closest("label").style.display = scope === "federal" ? "none" : "grid";
+  if (scope === "federal") setStateValidation("");
 }
 
 function updateDepthDescription() {
@@ -246,6 +292,7 @@ function renderScenarioPresets() {
 
 function renderQuestion(question) {
   state.currentQuestion = question;
+  state.isScreeningFinished = !question;
   if (!question) {
     questionEmpty.textContent = "No more questions queued. Results are ready.";
     questionEmpty.classList.remove("hidden");
@@ -391,16 +438,30 @@ function renderResultCard(item) {
 }
 
 function renderResults(payload) {
+  updateResultsLayout();
+
+  const federalOnly = isFederalOnlyScope();
+  const federalCount = payload.federal_results.filter((item) => item.eligibility_status !== "likely_ineligible").length;
+  const stateCount = federalOnly
+    ? 0
+    : payload.state_results.filter((item) => item.eligibility_status !== "likely_ineligible").length;
   const totalMatches =
-    payload.federal_results.filter((item) => item.eligibility_status !== "likely_ineligible").length +
-    payload.state_results.filter((item) => item.eligibility_status !== "likely_ineligible").length;
+    federalCount + stateCount;
   resultCount.textContent = `${totalMatches} live matches`;
 
   federalResults.classList.remove("empty");
-  stateResults.classList.remove("empty");
+  if (!federalOnly) stateResults.classList.remove("empty");
   federalResults.innerHTML = payload.federal_results.length
     ? payload.federal_results.map(renderResultCard).join("")
     : "<p class='meta'>No federal results yet. Answer more questions to improve matches.</p>";
+
+  if (federalOnly) {
+    stateResults.innerHTML = state.isScreeningFinished
+      ? "<p class='meta'>This is a federal-only session, so no state results are shown.</p>"
+      : "<p class='meta'>State results are hidden while Federal only scope is selected.</p>";
+    return;
+  }
+
   stateResults.innerHTML = payload.state_results.length
     ? payload.state_results.map(renderResultCard).join("")
     : "<p class='meta'>No state results yet. Answer more questions to improve matches.</p>";
@@ -662,23 +723,40 @@ startForm.addEventListener("submit", async (event) => {
   const submitBtn = startForm.querySelector("button[type='submit']");
   if (submitBtn && submitBtn.disabled) return;
   try {
+    setStateValidation("");
     const categories = selectedCategories();
     if (!categories.length) {
       setStatus("Select at least one category before applying your selections.");
       return;
     }
-    if (scopeSelect.value !== "federal" && !stateSelect.value) {
-      setStatus("Please select a state when using state or combined scope.");
+    if (!scopeSelect.value) {
+      setStatus("Choose a screening scope before starting your session.");
+      scrollToTopOf(startScreeningPanel);
+      scopeSelect.focus();
       return;
     }
-    if (submitBtn) setLoading(submitBtn, true);
-    setStatus("Creating session...");
+    if (scopeSelect.value !== "federal" && !stateSelect.value) {
+      const msg = "Please choose a state before starting state or combined screening.";
+      setStatus(msg);
+      setStateValidation(msg);
+      scrollToTopOf(startScreeningPanel);
+      stateSelect.focus();
+      return;
+    }
+    if (submitBtn) {
+      setLoading(submitBtn, true);
+      setBusyButtonText(submitBtn, true, "Searching...", "Apply selections");
+    }
+    federalResults.classList.add("skeleton");
+    stateResults.classList.add("skeleton");
+    setStatus("Searching for matching programs...");
     const payload = {
       scope: scopeSelect.value,
       state_code: stateSelect.value || null,
       categories,
       depth_value: parseFloat(depthSlider.value),
     };
+    state.activeScope = payload.scope;
     const session = await getJson("/api/v1/sessions", {
       method: "POST",
       body: JSON.stringify(payload),
@@ -690,7 +768,12 @@ startForm.addEventListener("submit", async (event) => {
   } catch (error) {
     setStatus(`Could not start session: ${error.message}`);
   } finally {
-    if (submitBtn) setLoading(submitBtn, false);
+    if (submitBtn) {
+      setLoading(submitBtn, false);
+      setBusyButtonText(submitBtn, false, "Searching...", "Apply selections");
+    }
+    federalResults.classList.remove("skeleton");
+    stateResults.classList.remove("skeleton");
   }
 });
 
@@ -730,6 +813,7 @@ document.querySelector("#show-results").addEventListener("click", async () => {
     await loadResults();
     await loadPlan();
     setStatus("Results refreshed.");
+    scrollToTopOf(resultsSection);
   } catch (error) {
     setStatus(`Could not refresh results: ${error.message}`);
   }
@@ -754,6 +838,9 @@ document.querySelector("#refresh-explorer").addEventListener("click", loadExplor
 document.querySelector("#select-all-categories").addEventListener("click", () => setAllCategories(true));
 document.querySelector("#clear-categories").addEventListener("click", () => setAllCategories(false));
 scopeSelect.addEventListener("change", updateStateVisibility);
+stateSelect.addEventListener("change", () => {
+  if (stateSelect.value) setStateValidation("");
+});
 depthSlider.addEventListener("input", updateDepthDescription);
 explorerForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -819,6 +906,7 @@ lifeEventsNode.addEventListener("click", async (event) => {
     updateStateVisibility();
     updateDepthDescription();
 
+    setAllCategories(false);
     preset.categories.forEach((cat) => {
       const checkbox = document.querySelector(`input[name="category"][value="${cat}"]`);
       if (checkbox) checkbox.checked = true;
@@ -842,6 +930,7 @@ lifeEventsNode.addEventListener("click", async (event) => {
       method: "POST",
       body: JSON.stringify(payload),
     });
+    state.activeScope = payload.scope;
     state.sessionId = session.session_id;
 
     if (Object.keys(preset.prefilled_answers).length) {
@@ -867,6 +956,8 @@ function resetApp() {
   state.sessionId = null;
   state.currentQuestion = null;
   state.latestPlan = null;
+  state.activeScope = null;
+  state.isScreeningFinished = false;
 
   scopeSelect.value = "both";
   stateSelect.value = "";
@@ -883,6 +974,7 @@ function resetApp() {
   renderPlan(null);
 
   resultCount.textContent = "0 live matches";
+  updateResultsLayout();
   federalResults.innerHTML = "No federal results yet.";
   federalResults.classList.add("empty");
   stateResults.innerHTML = "No state results yet.";
@@ -898,6 +990,14 @@ function resetApp() {
   setStatus("");
 }
 
+if (planEmptyCta) {
+  planEmptyCta.addEventListener("click", () => {
+    scrollToTopOf(startScreeningPanel);
+    const applyBtn = startForm.querySelector("button[type='submit']");
+    if (applyBtn) applyBtn.focus();
+  });
+}
+
 document.querySelector("#reset-button").addEventListener("click", resetApp);
 
 document.querySelector("#export-results").addEventListener("click", () => {
@@ -911,6 +1011,7 @@ document.querySelector("#export-results").addEventListener("click", () => {
 renderLifeEvents();
 renderCategories();
 renderScenarioPresets();
+updateResultsLayout();
 loadStates()
   .then(async () => {
     await Promise.all([loadReviewTasks(), loadExplorer()]);
