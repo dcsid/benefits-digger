@@ -351,6 +351,33 @@ def test_plan_compare_and_catalog_endpoints_work() -> None:
         assert all(".gov" in item["apply_url"] or ".us" in item["apply_url"] for item in catalog if item["apply_url"])
 
 
+def test_hybrid_explorer_supports_plain_english_description_without_llm() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/explorer/search",
+            json={
+                "description": "My family member died of COVID in California and I need help with funeral costs and survivor benefits.",
+                "scope": "both",
+                "limit": 10,
+                "use_llm": True,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+
+        assert payload["mode"] == "hybrid"
+        assert payload["interpretation"]["method"] == "heuristic"
+        assert payload["interpretation"]["applied_state_code"] == "CA"
+        assert any(item["key"] == "death" for item in payload["interpretation"]["applied_categories"])
+        assert payload["programs"]
+        assert any(program["jurisdiction"]["code"] == "CA" for program in payload["programs"])
+        assert any(program["match_reasons"] for program in payload["programs"])
+        assert any(
+            "funeral" in (program["name"] or "").lower() or "survivor" in (program["summary"] or "").lower()
+            for program in payload["programs"]
+        )
+
+
 def test_selected_state_suppresses_redundant_residency_questions_across_depths() -> None:
     seed_state_program_with_redundant_residency_rule()
 

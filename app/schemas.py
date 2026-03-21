@@ -58,3 +58,13 @@ class CompareScenarioInput(BaseModel):
 
 class ComparePayload(BaseModel):
     scenarios: list[CompareScenarioInput] = Field(default_factory=list)
+
+
+class ExplorerSearchPayload(BaseModel):
+    query: str = ""
+    description: str = ""
+    scope: Literal["federal", "state", "both"] = "both"
+    state_code: Optional[str] = None
+    categories: list[str] = Field(default_factory=list)
+    limit: int = Field(default=20, ge=1, le=100)
+    use_llm: bool = True

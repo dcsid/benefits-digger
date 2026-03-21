@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine, get_db
+from app.hybrid_explorer import hybrid_explorer_search
 from app.models import ScreeningSession
-from app.schemas import AnswerPayload, ComparePayload, SessionCreatePayload, SessionEnvelope
+from app.schemas import AnswerPayload, ComparePayload, ExplorerSearchPayload, SessionCreatePayload, SessionEnvelope
 from app.services import (
     bootstrap_catalog,
     compare_scenarios,
@@ -130,6 +131,20 @@ def program_catalog(
         state_code=state_code,
         categories=category_list,
         limit=min(max(limit, 1), 100),
+    )
+
+
+@app.post(f"{settings.api_v1_prefix}/explorer/search")
+def explorer_search(payload: ExplorerSearchPayload, db: Session = Depends(get_db)) -> dict:
+    return hybrid_explorer_search(
+        db,
+        query=payload.query,
+        description=payload.description,
+        scope=payload.scope,
+        state_code=payload.state_code,
+        categories=payload.categories,
+        limit=payload.limit,
+        use_llm=payload.use_llm,
     )
 
 

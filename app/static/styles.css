@@ -138,12 +138,18 @@ fieldset {
 select,
 input[type="date"],
 input[type="number"],
-input[type="text"] {
+input[type="text"],
+textarea {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: white;
   padding: 0.8rem 0.9rem;
   font: inherit;
+}
+
+textarea {
+  min-height: 7rem;
+  resize: vertical;
 }
 
 select.input-error {
@@ -409,6 +415,31 @@ fieldset {
 .explorer-item a,
 .mini-card a {
   word-break: break-word;
+}
+
+.search-reason-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+}
+
+.search-reason-list li + li {
+  margin-top: 0.25rem;
+}
+
+.explorer-insight {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.explorer-insight h3 {
+  margin: 0;
+}
+
+.explorer-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 a {
