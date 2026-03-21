@@ -45,11 +45,13 @@ body {
 .hero {
   grid-column: 1 / -1;
   padding: 2rem;
+  text-align: center;
 }
 
 #start-screening-panel {
   align-self: start;
 }
+
 .panel {
   padding: 1.25rem;
 }
@@ -76,7 +78,6 @@ legend {
 h1 {
   font-size: clamp(2rem, 4vw, 3.8rem);
   line-height: 0.98;
-  max-width: 14ch;
 }
 
 .empty-cta {
@@ -414,25 +415,6 @@ a {
   color: var(--accent);
 }
 
-.life-event-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 0.9rem;
-}
-
-.life-event-card {
-  display: grid;
-  gap: 0.4rem;
-  text-align: left;
-  border-radius: 18px;
-  padding: 1.1rem;
-  background: white;
-  color: var(--text);
-  border: 1px solid var(--line);
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
 .skeleton {
   position: relative;
   min-height: 120px;
@@ -462,20 +444,6 @@ a {
 @keyframes skeleton-shimmer {
   0% { background-position: 100% 0; }
   100% { background-position: 0 0; }
-}
-
-.life-event-card:hover {
-  border-color: var(--accent);
-  box-shadow: 0 4px 16px rgba(11, 110, 79, 0.12);
-}
-
-.life-event-card .event-icon {
-  font-size: 1.8rem;
-  line-height: 1;
-}
-
-.life-event-card strong {
-  display: block;
 }
 
 .certainty-breakdown {
@@ -619,4 +587,31 @@ input[type="range"]#depth-slider::-moz-range-thumb {
   justify-content: space-between;
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+.nav-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0;
+}
+
+.nav-link {
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.88rem;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-link:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.nav-link--active {
+  background: var(--accent);
+  color: white;
 }

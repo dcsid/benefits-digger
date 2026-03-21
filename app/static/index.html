@@ -8,6 +8,14 @@
   </head>
   <body>
     <main class="layout">
+      <nav class="nav-bar wide">
+        <a href="/" class="nav-link nav-link--active" aria-current="page">Home</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        <a href="/results" class="nav-link">Results</a>
+        <a href="/whatif" class="nav-link">What-If Lab</a>
+        <a href="/explorer" class="nav-link">Explorer</a>
+      </nav>
+
       <section class="hero">
         <p class="eyebrow">Benefits Digger</p>
         <h1>Plan, compare, and pursue benefits with official government evidence.</h1>
@@ -16,13 +24,7 @@
         </p>
       </section>
 
-      <section class="panel wide" id="life-event-section">
-        <h2>What brings you here?</h2>
-        <p class="meta">Pick a life event and we'll tailor your screening automatically, or skip to manual setup below.</p>
-        <div id="life-events" class="life-event-grid"></div>
-      </section>
-
-<section class="panel" id="start-screening-panel">
+      <section class="panel" id="start-screening-panel">
         <h2>Start Screening</h2>
         <form id="start-form" class="stack">
           <label>
@@ -68,13 +70,13 @@
             <div id="category-list" class="category-grid"></div>
           </fieldset>
 
-        <div class="row form-actions">
-        <button type="submit">Apply selections</button>
-        <button type="button" id="reset-button" class="ghost">Reset</button>
-        </div>
-        <div class="row utility-actions">
-        <button type="button" id="sync-button" class="ghost subtle">Refresh Official Sources</button>
-        </div>
+          <div class="row form-actions">
+            <button type="submit">Apply selections</button>
+            <button type="button" id="reset-button" class="ghost">Reset</button>
+          </div>
+          <div class="row utility-actions">
+            <button type="button" id="sync-button" class="ghost subtle">Refresh Official Sources</button>
+          </div>
         </form>
         <p id="status" class="status"></p>
       </section>
@@ -91,95 +93,6 @@
         </form>
       </section>
 
-      <section class="panel wide" id="results-section">
-        <div class="row spread">
-          <h2>Planning Dashboard</h2>
-          <span id="plan-depth-pill" class="pill">No active session</span>
-        </div>
-        <div id="plan-empty" class="empty empty-cta">
-          <p>No active session yet. Start a session to unlock planning summary, action steps, and missing-fact analysis.</p>
-          <button type="button" id="plan-empty-cta">Start a Session</button>
-        </div>
-        <div id="plan-shell" class="stack hidden">
-          <div id="overview-metrics" class="metric-grid"></div>
-          <div class="results-grid planner-grid">
-            <section class="plan-group">
-              <h3>Benefit stack</h3>
-              <div id="benefit-stack" class="stack"></div>
-            </section>
-            <section class="plan-group">
-              <h3>Top missing facts</h3>
-              <div id="missing-facts" class="stack"></div>
-            </section>
-          </div>
-          <div class="results-grid planner-grid">
-            <section class="plan-group">
-              <h3>Recommended next actions</h3>
-              <div id="action-plan" class="stack"></div>
-            </section>
-            <section class="plan-group">
-              <h3>Official source hub</h3>
-              <div id="source-hub" class="stack"></div>
-            </section>
-          </div>
-          <section class="plan-group">
-            <h3>Planning notes</h3>
-            <div id="planning-notes" class="stack"></div>
-          </section>
-        </div>
-      </section>
-
-      <section class="panel wide">
-        <div class="row spread">
-          <h2>Results</h2>
-          <div class="row">
-            <span id="result-count" class="pill">0 live matches</span>
-            <button type="button" id="export-results" class="ghost">Export Results</button>
-          </div>
-        </div>
-        <div id="results-grid" class="results-grid">
-          <div id="federal-results-column">
-            <h3>Federal Results</h3>
-            <div id="federal-results" class="result-list empty">No federal results yet.</div>
-          </div>
-          <div id="state-results-column">
-            <h3>State Results</h3>
-            <div id="state-results" class="result-list empty">No state results yet.</div>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="row spread">
-          <h2>What-If Lab</h2>
-          <span class="pill">Scenario compare</span>
-        </div>
-        <div class="dashboard-card-container">
-          <p class="meta">
-            Run scenario comparisons without changing your saved answers. These presets show how the result set changes if a life fact shifts.
-          </p>
-          <div id="scenario-presets" class="stack"></div>
-          <div id="scenario-results" class="stack empty">Start a session, then run a scenario.</div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="row spread">
-          <h2>Program Explorer</h2>
-          <button type="button" id="refresh-explorer" class="ghost">Refresh Explorer</button>
-        </div>
-        <div class="dashboard-card-container">
-          <form id="explorer-form" class="stack">
-            <label>
-              Search official programs
-              <input type="text" id="explorer-query" placeholder="Try retirement, disability, funeral, veterans..." />
-            </label>
-            <button type="submit">Search catalog</button>
-          </form>
-          <div id="explorer-results" class="stack empty">Use the explorer to browse the current official program catalog.</div>
-        </div>
-      </section>
-
       <section class="panel wide">
         <div class="row spread">
           <h2>Review Queue</h2>
@@ -188,6 +101,7 @@
         <div id="review-tasks" class="review-list empty">No review tasks yet.</div>
       </section>
     </main>
-    <script src="/static/app.js" defer></script>
+    <script src="/static/shared.js" defer></script>
+    <script src="/static/home.js" defer></script>
   </body>
-  </html>
+</html>

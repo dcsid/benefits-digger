@@ -65,8 +65,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.mount("/static", StaticFiles(directory=settings.static_dir), name="static")
-
 
 def require_admin_key(x_admin_key: str = Header(default="")) -> None:
     if not settings.admin_key:
@@ -78,6 +76,26 @@ def require_admin_key(x_admin_key: str = Header(default="")) -> None:
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(settings.static_dir / "index.html")
+
+
+@app.get("/dashboard", include_in_schema=False)
+def dashboard_page() -> FileResponse:
+    return FileResponse(settings.static_dir / "dashboard.html")
+
+
+@app.get("/results", include_in_schema=False)
+def results_page() -> FileResponse:
+    return FileResponse(settings.static_dir / "results.html")
+
+
+@app.get("/whatif", include_in_schema=False)
+def whatif_page() -> FileResponse:
+    return FileResponse(settings.static_dir / "whatif.html")
+
+
+@app.get("/explorer", include_in_schema=False)
+def explorer_page() -> FileResponse:
+    return FileResponse(settings.static_dir / "explorer.html")
 
 
 @app.get("/health")
@@ -211,3 +229,6 @@ def admin_sync(db: Session = Depends(get_db), _auth: None = Depends(require_admi
     summary = sync_remote_sources(db)
     summary["review_tasks"] = list_review_tasks(db)
     return summary
+
+
+app.mount("/static", StaticFiles(directory=settings.static_dir), name="static")

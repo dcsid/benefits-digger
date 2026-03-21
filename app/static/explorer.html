@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Program Explorer - Benefits Digger</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <nav class="nav-bar wide">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        <a href="/results" class="nav-link">Results</a>
+        <a href="/whatif" class="nav-link">What-If Lab</a>
+        <a href="/explorer" class="nav-link nav-link--active" aria-current="page">Explorer</a>
+      </nav>
+
+      <section class="panel wide">
+        <div class="row spread">
+          <h2>Program Explorer</h2>
+          <button type="button" id="refresh-explorer" class="ghost">Refresh Explorer</button>
+        </div>
+        <div class="dashboard-card-container">
+          <form id="explorer-form" class="stack">
+            <div class="results-grid">
+              <label>
+                Scope
+                <select id="scope" name="scope">
+                  <option value="both">Federal and state</option>
+                  <option value="federal">Federal only</option>
+                  <option value="state">State only</option>
+                </select>
+              </label>
+              <label>
+                State
+                <select id="state-code" name="state_code">
+                  <option value="">Choose a state</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Search official programs
+              <input type="text" id="explorer-query" placeholder="Try retirement, disability, funeral, veterans..." />
+            </label>
+            <button type="submit">Search catalog</button>
+          </form>
+          <div id="explorer-results" class="stack empty">Use the explorer to browse the current official program catalog.</div>
+        </div>
+      </section>
+    </main>
+    <script src="/static/shared.js" defer></script>
+    <script src="/static/explorer-page.js" defer></script>
+  </body>
+</html>

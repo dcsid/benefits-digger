@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>What-If Lab - Benefits Digger</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <nav class="nav-bar wide">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        <a href="/results" class="nav-link">Results</a>
+        <a href="/whatif" class="nav-link nav-link--active" aria-current="page">What-If Lab</a>
+        <a href="/explorer" class="nav-link">Explorer</a>
+      </nav>
+
+      <section class="panel wide">
+        <div class="row spread">
+          <h2>What-If Lab</h2>
+          <span class="pill">Scenario compare</span>
+        </div>
+        <p id="status" class="status"></p>
+        <div id="no-session" class="empty empty-cta hidden">
+          <p>No active session. <a href="/">Start a screening</a> first.</p>
+        </div>
+        <div class="dashboard-card-container">
+          <p class="meta">
+            Run scenario comparisons without changing your saved answers. These presets show how the result set changes if a life fact shifts.
+          </p>
+          <div id="scenario-presets" class="stack"></div>
+          <div id="scenario-results" class="stack empty">Start a session, then run a scenario.</div>
+        </div>
+      </section>
+    </main>
+    <script src="/static/shared.js" defer></script>
+    <script src="/static/whatif-page.js" defer></script>
+  </body>
+</html>

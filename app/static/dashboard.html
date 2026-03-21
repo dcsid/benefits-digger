@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Planning Dashboard - Benefits Digger</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <nav class="nav-bar wide">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/dashboard" class="nav-link nav-link--active" aria-current="page">Dashboard</a>
+        <a href="/results" class="nav-link">Results</a>
+        <a href="/whatif" class="nav-link">What-If Lab</a>
+        <a href="/explorer" class="nav-link">Explorer</a>
+      </nav>
+
+      <section class="panel wide">
+        <div class="row spread">
+          <h2>Planning Dashboard</h2>
+          <span id="plan-depth-pill" class="pill">No active session</span>
+        </div>
+        <div id="plan-empty" class="empty empty-cta">
+          <p>No active session yet. Start a session to unlock planning summary, action steps, and missing-fact analysis.</p>
+          <a href="/">Go to Home to start a session</a>
+        </div>
+        <div id="plan-shell" class="stack hidden">
+          <div id="overview-metrics" class="metric-grid"></div>
+          <div class="results-grid planner-grid">
+            <section class="plan-group">
+              <h3>Benefit stack</h3>
+              <div id="benefit-stack" class="stack"></div>
+            </section>
+            <section class="plan-group">
+              <h3>Top missing facts</h3>
+              <div id="missing-facts" class="stack"></div>
+            </section>
+          </div>
+          <div class="results-grid planner-grid">
+            <section class="plan-group">
+              <h3>Recommended next actions</h3>
+              <div id="action-plan" class="stack"></div>
+            </section>
+            <section class="plan-group">
+              <h3>Official source hub</h3>
+              <div id="source-hub" class="stack"></div>
+            </section>
+          </div>
+          <section class="plan-group">
+            <h3>Planning notes</h3>
+            <div id="planning-notes" class="stack"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <script src="/static/shared.js" defer></script>
+    <script src="/static/dashboard.js" defer></script>
+  </body>
+</html>

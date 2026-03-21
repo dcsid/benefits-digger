@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Results - Benefits Digger</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <nav class="nav-bar wide">
+        <a href="/" class="nav-link">Home</a>
+        <a href="/dashboard" class="nav-link">Dashboard</a>
+        <a href="/results" class="nav-link nav-link--active" aria-current="page">Results</a>
+        <a href="/whatif" class="nav-link">What-If Lab</a>
+        <a href="/explorer" class="nav-link">Explorer</a>
+      </nav>
+
+      <section class="panel wide" id="results-section">
+        <div class="row spread">
+          <h2>Results</h2>
+          <div class="row">
+            <span id="result-count" class="pill">0 live matches</span>
+            <button type="button" id="export-results" class="ghost">Export Results</button>
+          </div>
+        </div>
+        <div id="no-session" class="empty empty-cta hidden">
+          <p>No active session. <a href="/">Start a screening</a> first.</p>
+        </div>
+        <div id="results-grid" class="results-grid">
+          <div id="federal-results-column">
+            <h3>Federal Results</h3>
+            <div id="federal-results" class="result-list empty">No federal results yet.</div>
+          </div>
+          <div id="state-results-column">
+            <h3>State Results</h3>
+            <div id="state-results" class="result-list empty">No state results yet.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script src="/static/shared.js" defer></script>
+    <script src="/static/results-page.js" defer></script>
+  </body>
+</html>
