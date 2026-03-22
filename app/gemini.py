@@ -36,6 +36,41 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+# Maps canonical (federal) question keys to keyword patterns that indicate semantic
+# equivalence.  When Gemini invents a state-prefixed key whose prompt matches one of
+# these patterns, we reuse the canonical key so the user is only asked once.
+CANONICAL_QUESTION_PATTERNS: dict[str, list[str]] = {
+    "applicant_date_of_birth": [
+        "age", "date of birth", "how old", "birth date", "dob", "year of birth", "born",
+        "year you were born", "senior", "elderly", "older adult",
+    ],
+    "applicant_income": [
+        "income", "earn", "salary", "wages", "household income", "poverty",
+        "financial resource", "limited resource",
+    ],
+    "applicant_disability": [
+        "disability", "disabled", "impairment", "special needs",
+    ],
+    "applicant_ability_to_work": [
+        "unable to work", "cannot work", "ability to work",
+    ],
+    "applicant_served_in_active_military": [
+        "military", "veteran", "served", "active duty", "armed forces",
+    ],
+    "applicant_dolo": [
+        "death of", "lost a family", "deceased family", "bereavement",
+    ],
+}
+
+
+def _canonicalize_question_key(qkey: str, prompt: str, hint: str | None) -> str:
+    """If a Gemini-generated question matches a known canonical concept, return the canonical key."""
+    search_text = f"{qkey} {prompt} {hint or ''}".lower()
+    for canonical_key, patterns in CANONICAL_QUESTION_PATTERNS.items():
+        if any(pattern in search_text for pattern in patterns):
+            return canonical_key
+    return qkey
+
 STATE_NAMES = {
     "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas",
     "CA": "California", "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware",
@@ -159,6 +194,14 @@ IMPORTANT:
 - apply_url MUST be a real .gov website URL.
 - Include 2-5 programs per category.
 - Every radio/select question MUST have options.
+- IMPORTANT: For common demographic criteria, reuse these well-known question keys instead of inventing new ones:
+  - Age / date of birth → "applicant_date_of_birth"
+  - Income / limited resources → "applicant_income"
+  - Disability → "applicant_disability"
+  - Unable to work → "applicant_ability_to_work"
+  - Military service → "applicant_served_in_active_military"
+  - Death of family member → "applicant_dolo"
+  Only use a state-prefixed key (e.g. "{state_code.lower()}_...") for criteria that are truly state-specific and do not overlap with the above.
 - Question keys must be unique across all programs (use descriptive names).
 - Do NOT include state residency or "do you live in {state_name}" questions, because the applicant already selected {state_name} in the product.
 - If a program needs county, ZIP code, city, or another sub-state location, ask for that specific detail instead of general residency.
@@ -407,25 +450,36 @@ def _ingest_gemini_programs(db: Session, state_code: str, programs: list[dict[st
             ):
                 continue
 
-            all_questions.append({
-                "key": qkey,
-                "prompt": criterion.get("prompt", qkey),
-                "hint": criterion.get("hint"),
-                "input_type": criterion.get("input_type", "radio"),
-                "sensitivity_level": criterion.get("sensitivity_level", "low"),
-                "options": criterion.get("options"),
-            })
+            # Normalise to a canonical key when the question is semantically
+            # equivalent to an existing federal question (e.g. age, income).
+            original_qkey = qkey
+            qkey = _canonicalize_question_key(
+                qkey, criterion.get("prompt", ""), criterion.get("hint"),
+            )
+            was_canonicalized = qkey != original_qkey
 
-            for tier in ("simple", "standard", "detailed"):
-                all_variants.append({
-                    "question_key": qkey,
-                    "depth_tier": tier,
+            # When canonicalized, the question already exists in the DB from
+            # the federal seed — skip upserting to avoid overwriting its prompt.
+            if not was_canonicalized:
+                all_questions.append({
+                    "key": qkey,
                     "prompt": criterion.get("prompt", qkey),
                     "hint": criterion.get("hint"),
                     "input_type": criterion.get("input_type", "radio"),
-                    "options_json": criterion.get("options"),
-                    "normalizer": None,
+                    "sensitivity_level": criterion.get("sensitivity_level", "low"),
+                    "options": criterion.get("options"),
                 })
+
+                for tier in ("simple", "standard", "detailed"):
+                    all_variants.append({
+                        "question_key": qkey,
+                        "depth_tier": tier,
+                        "prompt": criterion.get("prompt", qkey),
+                        "hint": criterion.get("hint"),
+                        "input_type": criterion.get("input_type", "radio"),
+                        "options_json": criterion.get("options"),
+                        "normalizer": None,
+                    })
 
             db.add(EligibilityRule(
                 program_version_id=version.id,

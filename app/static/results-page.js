@@ -1,6 +1,7 @@
 const resultCount = document.querySelector("#result-count");
 const federalResults = document.querySelector("#federal-results");
 const stateResults = document.querySelector("#state-results");
+const federalResultsColumn = document.querySelector("#federal-results-column");
 const stateResultsColumn = document.querySelector("#state-results-column");
 const resultsGrid = document.querySelector("#results-grid");
 const noSession = document.querySelector("#no-session");
@@ -98,8 +99,10 @@ function redoScreening() {
 
 function updateResultsLayout() {
   const federalOnly = isFederalOnlyScope();
+  const stateOnly = isStateOnlyScope();
+  if (federalResultsColumn) federalResultsColumn.classList.toggle("hidden", stateOnly);
   if (stateResultsColumn) stateResultsColumn.classList.toggle("hidden", federalOnly);
-  if (resultsGrid) resultsGrid.classList.toggle("single-column", federalOnly);
+  if (resultsGrid) resultsGrid.classList.toggle("single-column", federalOnly || stateOnly);
 }
 
 function renderResults(payload) {
@@ -107,34 +110,33 @@ function renderResults(payload) {
   updateResultsLayout();
 
   const federalOnly = isFederalOnlyScope();
-  const federalCount = payload.federal_results.filter((item) => item.eligibility_status !== "likely_ineligible").length;
+  const stateOnly = isStateOnlyScope();
+  const federalCount = stateOnly
+    ? 0
+    : payload.federal_results.filter((item) => item.eligibility_status !== "likely_ineligible").length;
   const stateCount = federalOnly
     ? 0
     : payload.state_results.filter((item) => item.eligibility_status !== "likely_ineligible").length;
   const totalMatches = federalCount + stateCount;
   resultCount.textContent = t("results.liveMatches", { count: totalMatches });
 
-  federalResults.classList.remove("empty");
-  if (!federalOnly) stateResults.classList.remove("empty");
-  federalResults.innerHTML = payload.federal_results.length
-    ? payload.federal_results.map(renderResultCard).join("")
-    : `<p class='meta'>${t("results.noFederal")}</p>`;
-
-  if (federalOnly) {
-    stateResults.innerHTML = state.isScreeningFinished
-      ? `<p class='meta'>${t("results.federalOnlyFinished")}</p>`
-      : `<p class='meta'>${t("results.federalOnlyHidden")}</p>`;
-    syncAllResultScrollSpacers();
-    return;
+  if (!stateOnly) {
+    federalResults.classList.remove("empty");
+    federalResults.innerHTML = payload.federal_results.length
+      ? payload.federal_results.map(renderResultCard).join("")
+      : `<p class='meta'>${t("results.noFederal")}</p>`;
   }
 
-  stateResults.innerHTML = payload.state_results.length
-    ? payload.state_results.map(renderResultCard).join("")
-    : `<p class='meta'>${t("results.noState")}</p>`;
+  if (!federalOnly) {
+    stateResults.classList.remove("empty");
+    stateResults.innerHTML = payload.state_results.length
+      ? payload.state_results.map(renderResultCard).join("")
+      : `<p class='meta'>${t("results.noState")}</p>`;
+  }
 
   syncAllResultScrollSpacers();
-  syncArrowIndex(federalResults);
-  syncArrowIndex(stateResults);
+  if (!stateOnly) syncArrowIndex(federalResults);
+  if (!federalOnly) syncArrowIndex(stateResults);
 }
 
 async function loadResults() {

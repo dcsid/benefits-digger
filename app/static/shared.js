@@ -457,6 +457,10 @@ function isFederalOnlyScope() {
   return state.activeScope === "federal";
 }
 
+function isStateOnlyScope() {
+  return state.activeScope === "state";
+}
+
 function statusLabel(status) {
   return translateEnum("status", status, status.replaceAll("_", " "));
 }
