@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>What-If Lab - Benefits Digger</title>
+    <title data-i18n="page.whatifTitle">What-If Lab - Benefits Digger</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
@@ -15,8 +15,8 @@
         <a href="/whatif" class="nav-link nav-link--active" aria-current="page" data-i18n="nav.whatif">What-If Lab</a>
         <a href="/explorer" class="nav-link" data-i18n="nav.explorer">Explorer</a>
         <select id="lang-select" class="lang-select" onchange="loadLocale(this.value)">
-          <option value="en">EN</option>
-          <option value="es">ES</option>
+          <option value="en" data-i18n="lang.en">English</option>
+          <option value="es" data-i18n="lang.es">Español</option>
         </select>
       </nav>
 
@@ -27,14 +27,14 @@
         </div>
         <p id="status" class="status"></p>
         <div id="no-session" class="empty empty-cta hidden">
-          <p>No active session. <a href="/">Start a screening</a> first.</p>
+          <p data-i18n="whatif.noSession">No active session. <a href="/">Start a screening</a> first.</p>
         </div>
         <div class="dashboard-card-container">
-          <p class="meta">
+          <p class="meta" data-i18n="whatif.description">
             Run scenario comparisons without changing your saved answers. These presets show how the result set changes if a life fact shifts.
           </p>
           <div id="scenario-presets" class="stack"></div>
-          <div id="scenario-results" class="stack empty">Start a session, then run a scenario.</div>
+          <div id="scenario-results" class="stack empty" data-i18n="whatif.startThenRun">Start a session, then run a scenario.</div>
         </div>
       </section>
     </main>

@@ -12,6 +12,7 @@ function updateResultsLayout() {
 }
 
 function renderResults(payload) {
+  state.latestResults = payload;
   updateResultsLayout();
 
   const federalOnly = isFederalOnlyScope();
@@ -20,29 +21,30 @@ function renderResults(payload) {
     ? 0
     : payload.state_results.filter((item) => item.eligibility_status !== "likely_ineligible").length;
   const totalMatches = federalCount + stateCount;
-  resultCount.textContent = `${totalMatches} live matches`;
+  resultCount.textContent = t("results.liveMatches", { count: totalMatches });
 
   federalResults.classList.remove("empty");
   if (!federalOnly) stateResults.classList.remove("empty");
   federalResults.innerHTML = payload.federal_results.length
     ? payload.federal_results.map(renderResultCard).join("")
-    : "<p class='meta'>No federal results yet. Answer more questions to improve matches.</p>";
+    : `<p class='meta'>${t("results.noFederal")}</p>`;
 
   if (federalOnly) {
     stateResults.innerHTML = state.isScreeningFinished
-      ? "<p class='meta'>This is a federal-only session, so no state results are shown.</p>"
-      : "<p class='meta'>State results are hidden while Federal only scope is selected.</p>";
+      ? `<p class='meta'>${t("results.federalOnlyFinished")}</p>`
+      : `<p class='meta'>${t("results.federalOnlyHidden")}</p>`;
     return;
   }
 
   stateResults.innerHTML = payload.state_results.length
     ? payload.state_results.map(renderResultCard).join("")
-    : "<p class='meta'>No state results yet. Answer more questions to improve matches.</p>";
+    : `<p class='meta'>${t("results.noState")}</p>`;
 }
 
 async function loadResults() {
   if (!state.sessionId) {
     noSession.classList.remove("hidden");
+    noSession.innerHTML = `<p>${t("results.noSession")}</p>`;
     return;
   }
   const payload = await getJson(`/api/v1/sessions/${state.sessionId}/results`);
@@ -60,7 +62,7 @@ document.querySelector("#download-pdf").addEventListener("click", () => {
   const element = document.querySelector("#results-grid");
   if (!element) return;
   const btn = document.querySelector("#download-pdf");
-  setBusyButtonText(btn, true, "Generating...", "Download PDF");
+  setBusyButtonText(btn, true, t("results.generatingPdf"), t("results.downloadPdf"));
   btn.disabled = true;
   html2pdf()
     .set({
@@ -73,7 +75,7 @@ document.querySelector("#download-pdf").addEventListener("click", () => {
     .from(element)
     .save()
     .then(() => {
-      setBusyButtonText(btn, false, "Generating...", "Download PDF");
+      setBusyButtonText(btn, false, t("results.generatingPdf"), t("results.downloadPdf"));
       btn.disabled = false;
     });
 });
@@ -116,5 +118,14 @@ document.addEventListener("change", (e) => {
 
 updateResultsLayout();
 loadResults().catch((error) => {
-  federalResults.innerHTML = `<p class="meta">Could not load results: ${error.message}</p>`;
+  federalResults.innerHTML = `<p class="meta">${t("results.loadError", { error: error.message })}</p>`;
+});
+
+document.addEventListener("localechange", () => {
+  if (state.latestResults) {
+    renderResults(state.latestResults);
+    restoreDocChecks();
+  } else if (!state.sessionId) {
+    noSession.innerHTML = `<p>${t("results.noSession")}</p>`;
+  }
 });

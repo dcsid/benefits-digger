@@ -7,52 +7,57 @@ const explorerInsight = document.querySelector("#explorer-insight");
 const explorerResults = document.querySelector("#explorer-results");
 
 async function loadStates() {
+  const selectedValue = stateSelect.value;
   const states = await getJson("/api/v1/jurisdictions/states");
-  stateSelect.innerHTML = '<option value="">Choose a state</option>';
+  stateSelect.innerHTML = `<option value="">${escapeHtml(t("home.chooseState"))}</option>`;
   states.forEach((item) => {
     const option = document.createElement("option");
     option.value = item.code;
     option.textContent = `${item.name} (${item.code})`;
     stateSelect.appendChild(option);
   });
+  if (selectedValue) stateSelect.value = selectedValue;
 }
 
 function renderInsight(payload) {
   const interpretation = payload.interpretation || {};
   const categories = interpretation.applied_categories || [];
   const searchTerms = interpretation.search_terms || [];
-  const methodLabel = interpretation.llm_used ? "Gemini + grounded catalog" : "Grounded catalog + local interpretation";
-  const summary = interpretation.summary || "Browsing the official program catalog.";
+  const methodLabel = interpretation.llm_used ? t("explorer.methodGemini") : t("explorer.methodHeuristic");
+  const summary = categories.length || interpretation.applied_state_code || searchTerms.length
+    ? t("explorer.localizedSummary")
+    : t("explorer.browseSummary");
 
   explorerInsight.classList.remove("hidden");
   explorerInsight.classList.add("explorer-insight");
   explorerInsight.innerHTML = `
     <div class="row spread">
-      <h3>Search Interpretation</h3>
+      <h3>${t("explorer.interpretationTitle")}</h3>
       <span class="pill">${escapeHtml(methodLabel)}</span>
     </div>
     <p class="meta">${escapeHtml(summary)}</p>
     ${
       categories.length
-        ? `<div><strong>Need areas</strong><div class="explorer-chip-row">${categories
-            .map((category) => `<span class="pill">${escapeHtml(category.label)}</span>`)
+        ? `<div><strong>${t("explorer.needAreas")}</strong><div class="explorer-chip-row">${categories
+            .map((category) => `<span class="pill">${escapeHtml(getCategoryLabel(category.key || category.label))}</span>`)
             .join("")}</div></div>`
         : ""
     }
     ${
       interpretation.applied_state_code
-        ? `<p class="meta"><strong>State:</strong> ${escapeHtml(interpretation.applied_state_code)}</p>`
+        ? `<p class="meta"><strong>${t("explorer.stateLabel")}</strong> ${escapeHtml(interpretation.applied_state_code)}</p>`
         : ""
     }
     ${
       searchTerms.length
-        ? `<p class="meta"><strong>Search terms:</strong> ${escapeHtml(searchTerms.join(", "))}</p>`
+        ? `<p class="meta"><strong>${t("explorer.searchTerms")}</strong> ${escapeHtml(searchTerms.join(", "))}</p>`
         : ""
     }
   `;
 }
 
 function renderExplorer(payload) {
+  state.latestExplorerPayload = payload;
   const programs = payload.programs || [];
   renderInsight(payload);
 
@@ -64,20 +69,20 @@ function renderExplorer(payload) {
             <article class="mini-card explorer-item">
               <div class="row spread">
                 <h4>${escapeHtml(program.name)}</h4>
-                <span class="pill">Score ${program.search_score}</span>
+                <span class="pill">${t("explorer.score", { score: program.search_score })}</span>
               </div>
-              <p class="meta">${escapeHtml(program.agency || "Unknown agency")} · ${escapeHtml(program.jurisdiction.name)}</p>
-              <p>${escapeHtml(program.summary || "No summary available.")}</p>
+              <p class="meta">${escapeHtml(program.agency || t("card.unknownAgency"))} · ${escapeHtml(program.jurisdiction.name)}</p>
+              <p>${escapeHtml(translateDynamicText(program.summary) || t("card.noSummary"))}</p>
               ${
                 program.match_reasons?.length
                   ? `<ul class="search-reason-list">${program.match_reasons
-                      .map((reason) => `<li>${escapeHtml(reason)}</li>`)
+                      .map((reason) => `<li>${escapeHtml(translateDynamicText(reason))}</li>`)
                       .join("")}</ul>`
                   : ""
               }
               ${
                 program.apply_url
-                  ? `<p><a href="${escapeHtml(program.apply_url)}" target="_blank" rel="noreferrer">Open official government page</a></p>`
+                  ? `<p><a href="${escapeHtml(program.apply_url)}" target="_blank" rel="noreferrer">${t("explorer.openOfficial")}</a></p>`
                   : ""
               }
               ${
@@ -91,7 +96,7 @@ function renderExplorer(payload) {
           `,
         )
         .join("")
-    : "<p class='meta'>No programs matched this search. Try a broader description or remove a filter.</p>";
+    : `<p class='meta'>${t("explorer.noMatch")}</p>`;
 }
 
 async function loadExplorer() {
@@ -114,19 +119,19 @@ explorerForm.addEventListener("submit", async (event) => {
   const query = explorerQuery.value.trim();
   const description = explorerDescription.value.trim();
   if (!description && query.length > 0 && query.length < 2) {
-    explorerResults.innerHTML = `<p class="meta">Enter at least 2 characters for exact keyword search.</p>`;
+    explorerResults.innerHTML = `<p class="meta">${t("explorer.minChars")}</p>`;
     return;
   }
   try {
     await loadExplorer();
   } catch (error) {
-    explorerResults.innerHTML = `<p class="meta">Explorer failed: ${error.message}</p>`;
+    explorerResults.innerHTML = `<p class="meta">${t("explorer.failed", { error: error.message })}</p>`;
   }
 });
 
 document.querySelector("#refresh-explorer").addEventListener("click", () => {
   loadExplorer().catch((error) => {
-    explorerResults.innerHTML = `<p class="meta">Explorer failed: ${error.message}</p>`;
+    explorerResults.innerHTML = `<p class="meta">${t("explorer.failed", { error: error.message })}</p>`;
   });
 });
 
@@ -135,3 +140,14 @@ loadStates()
   .catch((error) => {
     explorerResults.innerHTML = `<p class="meta">${error.message}</p>`;
   });
+
+document.addEventListener("localechange", () => {
+  loadStates().catch((error) => {
+    explorerResults.innerHTML = `<p class="meta">${error.message}</p>`;
+  });
+  if (state.latestExplorerPayload) {
+    renderExplorer(state.latestExplorerPayload);
+  } else {
+    explorerResults.innerHTML = `<p class="meta">${t("explorer.empty")}</p>`;
+  }
+});

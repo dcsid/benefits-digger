@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Benefits Digger</title>
+    <title data-i18n="page.homeTitle">Benefits Digger</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
@@ -15,8 +15,8 @@
         <a href="/whatif" class="nav-link" data-i18n="nav.whatif">What-If Lab</a>
         <a href="/explorer" class="nav-link" data-i18n="nav.explorer">Explorer</a>
         <select id="lang-select" class="lang-select" onchange="loadLocale(this.value)">
-          <option value="en">EN</option>
-          <option value="es">ES</option>
+          <option value="en" data-i18n="lang.en">English</option>
+          <option value="es" data-i18n="lang.es">Español</option>
         </select>
       </nav>
 
@@ -32,23 +32,24 @@
         <h2 data-i18n="home.startScreening">Start Screening</h2>
         <form id="start-form" class="stack">
           <label>
-            Scope
+            <span data-i18n="home.scope">Scope</span>
             <select id="scope" name="scope">
-              <option value="both">Federal and state</option>
-              <option value="federal">Federal only</option>
-              <option value="state">State only</option>
+              <option value="both" data-i18n="home.scopeBoth">Federal and state</option>
+              <option value="federal" data-i18n="home.scopeFederal">Federal only</option>
+              <option value="state" data-i18n="home.scopeState">State only</option>
             </select>
           </label>
 
           <label>
-            State
+            <span data-i18n="home.state">State</span>
             <select id="state-code" name="state_code">
-              <option value="">Choose a state</option>
+              <option value="" data-i18n="home.chooseState">Choose a state</option>
             </select>
             <p id="state-validation" class="field-message hidden" aria-live="polite"></p>
           </label>
 
           <label>
+<<<<<<< HEAD
             Depth
             <input type="range" id="depth-slider" name="depth_value" min="0" max="1" step="0.01" value="0.5" />
             <div class="depth-pills" role="group" aria-label="Depth presets">
@@ -64,6 +65,15 @@
                 <strong>Deep</strong>
                 <span class="meta">~24 questions</span>
               </button>
+=======
+            <span data-i18n="home.depth">Depth</span>
+            <input type="range" id="depth-slider" name="depth_value"
+                   min="0" max="1" step="0.01" value="0.5" />
+            <div class="depth-labels">
+              <span data-i18n="home.depthQuick">Quick</span>
+              <span data-i18n="home.depthStandard">Standard</span>
+              <span data-i18n="home.depthDeep">Deep</span>
+>>>>>>> 9a8c110b91c3657d4e0b1430cdf776632fb709bc
             </div>
           </label>
           <p id="depth-description" class="meta">
@@ -72,7 +82,7 @@
 
           <fieldset class="category-picker">
             <legend data-i18n="home.categories">Benefit categories</legend>
-            <p class="meta">
+            <p class="meta" data-i18n="home.categoriesHint">
               Select at least one category to find benefits you may qualify for and information on how to apply.
             </p>
             <div class="row">
@@ -91,21 +101,23 @@
           </div>
           <div class="admin-access stack">
             <label>
-              Admin access key
+              <span data-i18n="home.adminKey">Admin access key</span>
               <input
                 type="password"
                 id="admin-key"
                 placeholder="Only needed when admin protection is enabled"
+                data-i18n="home.adminPlaceholder"
+                data-i18n-attr="placeholder"
                 autocomplete="off"
                 spellcheck="false"
               />
             </label>
-            <p class="meta">
+            <p class="meta" data-i18n="home.adminHelp">
               Used only for review queue and source refresh actions. Stored in this browser tab until you clear it.
             </p>
             <div class="row utility-actions">
-              <button type="button" id="save-admin-key" class="ghost subtle">Save key</button>
-              <button type="button" id="clear-admin-key" class="ghost subtle">Clear key</button>
+              <button type="button" id="save-admin-key" class="ghost subtle" data-i18n="home.saveKey">Save key</button>
+              <button type="button" id="clear-admin-key" class="ghost subtle" data-i18n="home.clearKey">Clear key</button>
             </div>
           </div>
         </form>
@@ -129,7 +141,7 @@
           <h2 data-i18n="home.reviewQueue">Review Queue</h2>
           <button type="button" id="refresh-review" class="ghost" data-i18n="home.refreshQueue">Refresh Queue</button>
         </div>
-        <div id="review-tasks" class="review-list empty">No review tasks yet.</div>
+        <div id="review-tasks" class="review-list empty" data-i18n="home.noReviewTasks">No review tasks yet.</div>
       </section>
     </main>
     <script src="/static/shared.js" defer></script>
