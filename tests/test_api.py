@@ -206,6 +206,198 @@ def seed_state_program_with_redundant_residency_rule() -> None:
         db.commit()
 
 
+def seed_category_question_priority_programs() -> None:
+    with SessionLocal() as db:
+        federal = db.scalar(select(Jurisdiction).where(Jurisdiction.code == "federal", Jurisdiction.level == "federal"))
+        assert federal is not None
+
+        agency = db.scalar(
+            select(Agency).where(
+                Agency.jurisdiction_id == federal.id,
+                Agency.name == "Federal Education Test Agency",
+            )
+        )
+        if agency is None:
+            agency = Agency(
+                jurisdiction_id=federal.id,
+                name="Federal Education Test Agency",
+                homepage_url="https://www.ed.gov/",
+            )
+            db.add(agency)
+            db.flush()
+
+        question_specs = [
+            (
+                "education_current_student_status",
+                "Are you currently enrolled in college, school, or a job training program?",
+                "radio",
+                "low",
+                [
+                    {"label": "Yes", "value": "Yes"},
+                    {"label": "No", "value": "No"},
+                ],
+                110.0,
+            ),
+            (
+                "education_income_screen",
+                "Do you have low income?",
+                "radio",
+                "low",
+                [
+                    {"label": "Yes", "value": "Yes"},
+                    {"label": "No", "value": "No"},
+                ],
+                190.0,
+            ),
+            (
+                "education_exact_tuition_cost",
+                "What is your yearly tuition cost?",
+                "currency",
+                "high",
+                None,
+                480.0,
+            ),
+        ]
+        for key, prompt, input_type, sensitivity, options, weight in question_specs:
+            question = db.scalar(select(Question).where(Question.key == key))
+            if question is None:
+                db.add(
+                    Question(
+                        key=key,
+                        prompt=prompt,
+                        hint=None,
+                        input_type=input_type,
+                        sensitivity_level=sensitivity,
+                        options_json=options,
+                        sort_weight=weight,
+                    )
+                )
+
+        prioritized_program = db.scalar(select(Program).where(Program.slug == "federal-education-priority-grant"))
+        if prioritized_program is None:
+            prioritized_program = Program(
+                slug="federal-education-priority-grant",
+                name="Federal Education Priority Grant",
+                kind="benefit",
+                category="education",
+                family="education_grant",
+                summary="Regression test program to prioritize education-specific screening questions.",
+                apply_url="https://www.ed.gov/",
+                status="active",
+                jurisdiction_id=federal.id,
+                agency_id=agency.id,
+            )
+            db.add(prioritized_program)
+            db.flush()
+
+        detailed_program = db.scalar(select(Program).where(Program.slug == "federal-education-detailed-grant"))
+        if detailed_program is None:
+            detailed_program = Program(
+                slug="federal-education-detailed-grant",
+                name="Federal Education Detailed Grant",
+                kind="benefit",
+                category="education",
+                family="education_grant",
+                summary="Regression test program to ensure breadth limits can defer invasive education questions.",
+                apply_url="https://www.ed.gov/",
+                status="active",
+                jurisdiction_id=federal.id,
+                agency_id=agency.id,
+            )
+            db.add(detailed_program)
+            db.flush()
+
+        def ensure_version(program: Program, signature: str) -> ProgramVersion:
+            version = db.scalar(
+                select(ProgramVersion).where(
+                    ProgramVersion.program_id == program.id,
+                    ProgramVersion.publication_state == "published",
+                )
+            )
+            if version is None:
+                version = ProgramVersion(
+                    program_id=program.id,
+                    version_label="test-category-priority",
+                    signature=signature,
+                    publication_state="published",
+                    published_at=datetime.utcnow(),
+                    change_summary="Regression fixture for category-aware question scoring.",
+                    source_freshness_days=0,
+                )
+                db.add(version)
+                db.flush()
+            return version
+
+        prioritized_version = ensure_version(prioritized_program, "federal-education-priority-grant-v1")
+        detailed_version = ensure_version(detailed_program, "federal-education-detailed-grant-v1")
+
+        if not db.scalar(select(EligibilityRule).where(EligibilityRule.program_version_id == prioritized_version.id)):
+            db.add_all(
+                [
+                    EligibilityRule(
+                        program_version_id=prioritized_version.id,
+                        question_key="education_current_student_status",
+                        operator="matches_any",
+                        expected_values_json=["Yes"],
+                        label="You are enrolled in school, college, or an education training program.",
+                        priority=80,
+                        source_key="education-priority-source",
+                        source_citation="https://www.ed.gov/",
+                    ),
+                    EligibilityRule(
+                        program_version_id=prioritized_version.id,
+                        question_key="education_income_screen",
+                        operator="matches_any",
+                        expected_values_json=["Yes"],
+                        label="You have low income.",
+                        priority=80,
+                        source_key="education-priority-source",
+                        source_citation="https://www.ed.gov/",
+                    ),
+                    AmountRule(
+                        program_version_id=prioritized_version.id,
+                        amount_type="range",
+                        display_text="Priority grant amount varies.",
+                        source_key="education-priority-source",
+                    ),
+                ]
+            )
+
+        if not db.scalar(select(EligibilityRule).where(EligibilityRule.program_version_id == detailed_version.id)):
+            db.add_all(
+                [
+                    EligibilityRule(
+                        program_version_id=detailed_version.id,
+                        question_key="education_exact_tuition_cost",
+                        operator="lte",
+                        expected_values_json=["25000"],
+                        label="Your yearly tuition costs are within the grant cap.",
+                        priority=95,
+                        source_key="education-detailed-source",
+                        source_citation="https://www.ed.gov/",
+                    ),
+                    EligibilityRule(
+                        program_version_id=detailed_version.id,
+                        question_key="education_income_screen",
+                        operator="matches_any",
+                        expected_values_json=["Yes"],
+                        label="You have low income.",
+                        priority=70,
+                        source_key="education-detailed-source",
+                        source_citation="https://www.ed.gov/",
+                    ),
+                    AmountRule(
+                        program_version_id=detailed_version.id,
+                        amount_type="range",
+                        display_text="Detailed grant amount varies.",
+                        source_key="education-detailed-source",
+                    ),
+                ]
+            )
+
+        db.commit()
+
+
 def test_session_flow_returns_federal_and_state_results() -> None:
     with TestClient(app) as client:
         states = client.get("/api/v1/jurisdictions/states")
@@ -341,6 +533,55 @@ def test_depth_controls_question_specificity() -> None:
         assert detailed_question["input_type"] == "date"
         assert "approximate age" in high_level_question["prompt"].lower()
         assert "exact date of birth" in detailed_question["prompt"].lower()
+
+
+def test_selected_category_prioritizes_category_specific_questions() -> None:
+    seed_category_question_priority_programs()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/sessions",
+            json={
+                "scope": "federal",
+                "categories": ["education"],
+                "breadth_value": 1.0,
+                "depth_value": 0.5,
+            },
+        )
+
+        assert response.status_code == 200
+        next_question = response.json()["next_question"]
+        assert next_question["key"] == "education_current_student_status"
+        assert "school" in next_question["prompt"].lower() or "college" in next_question["prompt"].lower()
+
+
+def test_breadth_constraints_can_override_more_detailed_category_questions() -> None:
+    seed_category_question_priority_programs()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/sessions",
+            json={
+                "scope": "federal",
+                "categories": ["education"],
+                "breadth_value": 0.0,
+                "depth_value": 1.0,
+            },
+        )
+        assert response.status_code == 200
+        session_id = response.json()["session_id"]
+        assert response.json()["next_question"]["key"] == "education_current_student_status"
+
+        follow_up = client.post(
+            f"/api/v1/sessions/{session_id}/answers",
+            json={"answers": {"education_current_student_status": "Yes"}},
+        )
+        assert follow_up.status_code == 200
+
+        next_question = follow_up.json()["next_question"]
+        assert next_question is not None
+        assert next_question["key"] == "education_income_screen"
+        assert next_question["key"] != "education_exact_tuition_cost"
 
 
 def test_plan_compare_and_catalog_endpoints_work() -> None:

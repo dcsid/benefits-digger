@@ -267,6 +267,35 @@ CATEGORY_LABELS = {
     "retirement_seniors": "Retirement and seniors",
     "welfare_cash_assistance": "Welfare and cash assistance",
 }
+QUESTION_CATEGORY_HINTS = {
+    "children_families": {"child", "children", "childcare", "dependent", "family", "parent", "pregnancy"},
+    "family": {"child", "children", "childcare", "dependent", "family", "parent", "pregnancy"},
+    "death": {"burial", "death", "funeral", "survivor"},
+    "survivor": {"burial", "death", "funeral", "survivor"},
+    "disabilities": {"accessible", "disability", "disabled", "impairment", "medical", "ssi", "ssdi"},
+    "disability": {"accessible", "disability", "disabled", "impairment", "medical", "ssi", "ssdi"},
+    "ssdi": {"disability", "disabled", "ssdi", "work credits"},
+    "ssi": {"disabled", "income", "resources", "ssi"},
+    "disasters": {"disaster", "emergency", "evacuation", "fema", "fire", "flood", "storm"},
+    "funeral_assistance": {"burial", "death", "funeral"},
+    "education": {"college", "education", "grant", "school", "scholarship", "student", "training", "tuition", "university"},
+    "food": {"food", "meal", "nutrition", "snap", "wic"},
+    "health": {"coverage", "health", "insurance", "medical", "medicaid", "medicare", "prescription"},
+    "housing_utilities": {"electric", "energy", "heating", "home", "housing", "internet", "mortgage", "rent", "rental", "shelter", "utility", "voucher", "water"},
+    "housing": {"electric", "energy", "heating", "home", "housing", "internet", "mortgage", "rent", "rental", "shelter", "utility", "voucher", "water"},
+    "utility": {"electric", "energy", "heating", "internet", "utility", "water"},
+    "jobs_unemployment": {"employment", "job", "laid off", "training", "unemployment", "wage", "worker", "workforce"},
+    "jobs": {"employment", "job", "laid off", "training", "unemployment", "wage", "worker", "workforce"},
+    "unemployment": {"employment", "job", "laid off", "unemployment", "wage", "worker", "workforce"},
+    "military_veterans": {"military", "service", "va", "veteran"},
+    "veteran": {"military", "service", "va", "veteran"},
+    "va_disability": {"military", "service", "va", "veteran"},
+    "retirement_seniors": {"older adult", "pension", "retire", "retirement", "senior", "social security"},
+    "retirement": {"older adult", "pension", "retire", "retirement", "senior", "social security"},
+    "social_security": {"older adult", "retire", "retirement", "social security"},
+    "welfare_cash_assistance": {"assistance", "benefit amount", "cash", "income", "resources", "tanf", "welfare"},
+    "cash": {"assistance", "benefit amount", "cash", "income", "resources", "tanf", "welfare"},
+}
 
 
 def bootstrap_catalog(db: Session, use_remote: bool = True) -> None:
@@ -1285,8 +1314,14 @@ def score_unanswered_questions(
 ) -> dict[str, float]:
     policy = get_breadth_policy(session)
     scores: dict[str, float] = {}
+    focused_scores: dict[str, float] = {}
+    non_referral_scores: dict[str, float] = {}
     candidate_programs = get_candidate_programs(db, session)
     answers_count = len(answers)
+    selected_categories = {
+        category for category in session.categories_json or [] if category and category != "all"
+    }
+    expanded_categories = expand_category_filters(selected_categories)
     for program in candidate_programs:
         version = get_latest_version(db, program.id)
         if version is None:
@@ -1313,12 +1348,24 @@ def score_unanswered_questions(
                 continue
             depth_weight = policy["weights"].get(question.sensitivity_level, 1.0)
             sensitivity_bonus = policy["bonuses"].get(question.sensitivity_level, 0)
-            scores[rule.question_key] = (
-                scores.get(rule.question_key, 0.0)
-                + rule.priority * depth_weight
+            score_increment = (
+                rule.priority * depth_weight
                 + question.sort_weight
                 + sensitivity_bonus
             )
+            scores[rule.question_key] = scores.get(rule.question_key, 0.0) + score_increment
+
+            if program.kind != "referral":
+                non_referral_scores[rule.question_key] = non_referral_scores.get(rule.question_key, 0.0) + score_increment
+
+            focus_score = question_category_focus_score(question, rule, program, expanded_categories)
+            if focus_score > 0:
+                focused_scores[rule.question_key] = focused_scores.get(rule.question_key, 0.0) + score_increment + focus_score
+
+    if focused_scores:
+        return focused_scores
+    if selected_categories and non_referral_scores:
+        return non_referral_scores
     return scores
 
 
@@ -1361,6 +1408,46 @@ def program_matches_categories(program: Program, expanded_categories: set[str]) 
         if category in expanded_categories and any(keyword in haystack for keyword in keywords):
             return True
     return False
+
+
+def category_focus_hints(categories: set[str]) -> set[str]:
+    hints: set[str] = set()
+    for category in categories:
+        hints.update(QUESTION_CATEGORY_HINTS.get(category, set()))
+        if category not in QUESTION_CATEGORY_HINTS:
+            hints.update(token for token in normalize_match_text(category).split() if token)
+    return {hint for hint in hints if hint}
+
+
+def question_category_focus_score(
+    question: Question,
+    rule: EligibilityRule,
+    program: Program,
+    selected_categories: set[str],
+) -> int:
+    if not selected_categories or program.kind == "referral":
+        return 0
+
+    hints = category_focus_hints(selected_categories)
+    if not hints:
+        return 0
+
+    question_text = " ".join(
+        [
+            normalize_match_text(question.prompt),
+            normalize_match_text(question.hint),
+            normalize_match_text(rule.label),
+        ]
+    )
+    focus = sum(1 for hint in hints if hint in question_text)
+    if focus == 0:
+        return 0
+
+    # Reward truly category-specific prompts more than generic program metadata.
+    focus_score = focus * 70
+    if program.category in selected_categories or program.family in selected_categories:
+        focus_score += 20
+    return focus_score
 
 
 def supersede_published_versions(db: Session, program_id: int) -> None:
