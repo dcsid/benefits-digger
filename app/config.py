@@ -17,9 +17,10 @@ class Settings(BaseSettings):
     max_results_per_section: int = 12
     admin_key: str = ""
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3.1-flash-lite-preview"
+    gemini_model: str = "gemini-3-pro-preview"
     gemini_structured_temperature: float = 0.3
     gemini_chat_temperature: float = 0.7
+    gemini_search_grounding_enabled: bool = True
     crawl_max_depth: int = 1
     crawl_max_pages_per_site: int = 8
     crawl_relevant_page_limit: int = 4
