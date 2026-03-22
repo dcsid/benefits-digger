@@ -10,10 +10,41 @@ const questionForm = document.querySelector("#question-form");
 const questionShell = document.querySelector("#question-shell");
 const questionEmpty = document.querySelector("#question-empty");
 const categoryList = document.querySelector("#category-list");
-// const reviewTasksNode = document.querySelector("#review-tasks");
-// const adminKeyInput = document.querySelector("#admin-key");
-// const saveAdminKeyButton = document.querySelector("#save-admin-key");
-// const clearAdminKeyButton = document.querySelector("#clear-admin-key");
+const adminKeyInput = document.querySelector("#admin-key");
+const saveAdminKeyButton = document.querySelector("#save-admin-key");
+const clearAdminKeyButton = document.querySelector("#clear-admin-key");
+
+const lifeIntakeDescription = document.querySelector("#life-intake-description");
+const lifeIntakeAnalyzeButton = document.querySelector("#life-intake-analyze");
+const lifeIntakeClearButton = document.querySelector("#life-intake-clear");
+const lifeIntakeStatus = document.querySelector("#life-intake-status");
+const lifeIntakeOutput = document.querySelector("#life-intake-output");
+const lifeIntakeSummary = document.querySelector("#life-intake-summary");
+const lifeIntakeScope = document.querySelector("#life-intake-scope");
+const lifeIntakeState = document.querySelector("#life-intake-state");
+const lifeIntakeCategories = document.querySelector("#life-intake-categories");
+const lifeIntakeFacts = document.querySelector("#life-intake-facts");
+const lifeIntakeMissing = document.querySelector("#life-intake-missing");
+const lifeIntakeApplyButton = document.querySelector("#life-intake-apply");
+const lifeIntakeStartButton = document.querySelector("#life-intake-start");
+const lifeChatEmpty = document.querySelector("#life-chat-empty");
+const lifeChatbox = document.querySelector("#life-chatbox");
+const lifeChatMessages = document.querySelector("#life-chat-messages");
+const lifeChatForm = document.querySelector("#life-chat-form");
+const lifeChatInput = document.querySelector("#life-chat-input");
+
+const intakeState = {
+  description: "",
+  payload: null,
+  messages: [],
+  pendingQuestionKey: null,
+};
+
+function saveAdminKeyFromInput() {
+  if (!adminKeyInput) return;
+  setAdminKey(adminKeyInput.value);
+  setStatus(adminKeyInput.value.trim() ? t("home.adminSaved") : t("home.adminCleared"));
+}
 
 function setStateValidation(message = "") {
   if (!stateValidation || !stateSelect) return;
@@ -31,6 +62,11 @@ function setStateValidation(message = "") {
   stateSelect.setAttribute("aria-invalid", "true");
 }
 
+function setLifeIntakeStatus(message = "") {
+  if (!lifeIntakeStatus) return;
+  lifeIntakeStatus.textContent = message;
+}
+
 async function loadStates() {
   const selectedValue = stateSelect.value;
   const states = await getJson("/api/v1/jurisdictions/states");
@@ -45,8 +81,14 @@ async function loadStates() {
 }
 
 function selectedCategories() {
-  const boxes = [...document.querySelectorAll('input[name="category"]:checked')];
-  return boxes.map((box) => box.value);
+  return [...document.querySelectorAll('input[name="category"]:checked')].map((box) => box.value);
+}
+
+function setSelectedCategories(values = []) {
+  const selected = new Set(values);
+  document.querySelectorAll('input[name="category"]').forEach((input) => {
+    input.checked = selected.has(input.value);
+  });
 }
 
 function updateStateVisibility() {
@@ -55,14 +97,24 @@ function updateStateVisibility() {
   if (scope === "federal") setStateValidation("");
 }
 
+function estimateDepthQuestionCount(depthValue) {
+  const v = Math.max(0, Math.min(1, depthValue));
+  if (v <= 0.5) {
+    const ratio = v / 0.5;
+    return Math.round(4 + (10 - 4) * ratio);
+  }
+  const ratio = (v - 0.5) / 0.5;
+  return Math.round(10 + (24 - 10) * ratio);
+}
+
 function updateDepthDescription() {
   const val = parseFloat(depthSlider.value);
   let best = depthDescriptions[0];
-  for (const d of depthDescriptions) {
-    if (Math.abs(d.at - val) < Math.abs(best.at - val)) best = d;
+  for (const descriptor of depthDescriptions) {
+    if (Math.abs(descriptor.at - val) < Math.abs(best.at - val)) best = descriptor;
   }
-  const maxQ = estimateDepthQuestionCount(val);
   const descriptor = getDepthDescriptor(best.at);
+  const maxQ = estimateDepthQuestionCount(val);
   depthDescription.textContent = t("home.breadthApprox", { description: descriptor.text, count: maxQ });
 
   depthPills.forEach((pill) => {
@@ -73,27 +125,15 @@ function updateDepthDescription() {
   });
 }
 
-function estimateDepthQuestionCount(depthValue) {
-  // Keep this consistent with backend DEPTH_ANCHORS interpolation.
-  const v = Math.max(0, Math.min(1, depthValue));
-  if (v <= 0.5) {
-    const t = v / 0.5;
-    return Math.round(4 + (10 - 4) * t);
-  }
-  const t = (v - 0.5) / 0.5;
-  return Math.round(10 + (24 - 10) * t);
-}
-
 function renderCategories() {
   const selected = new Set(selectedCategories());
   categoryList.innerHTML = categoryDefinitions
     .map(
       (category) => `
         <label class="category-option">
-          <input type="checkbox" name="category" value="${category.value}" />
+          <input type="checkbox" name="category" value="${category.value}" ${selected.has(category.value) ? "checked" : ""} />
           <span class="category-icon" aria-hidden="true">${category.icon || "•"}</span>
-          <span>${category.label}</span>
-
+          <span>${escapeHtml(getCategoryLabel(category.value))}</span>
         </label>
       `,
     )
@@ -129,7 +169,7 @@ function renderQuestion(question) {
       .map(
         (option) => `
           <label class="choice">
-            <input type="radio" name="answer" value="${option.value}" required />
+            <input type="radio" name="answer" value="${escapeHtml(option.value)}" required />
             <span>${escapeHtml(translateDynamicText(option.label))}</span>
           </label>
         `,
@@ -140,7 +180,7 @@ function renderQuestion(question) {
       <select name="answer" required>
         <option value="">${escapeHtml(t("home.chooseOne"))}</option>
         ${question.options
-          .map((option) => `<option value="${option.value}">${escapeHtml(translateDynamicText(option.label))}</option>`)
+          .map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(translateDynamicText(option.label))}</option>`)
           .join("")}
       </select>
     `;
@@ -151,7 +191,6 @@ function renderQuestion(question) {
   } else {
     inputMarkup = '<input type="text" name="answer" required />';
   }
-
 
   questionShell.innerHTML = `
     <div class="stack">
@@ -167,42 +206,238 @@ function renderQuestion(question) {
   `;
 }
 
-/* -- Review Queue – commented out for now --
-function renderReviewTasks(tasks) {
-  state.latestReviewTasks = tasks;
-  reviewTasksNode.classList.remove("empty");
-  reviewTasksNode.innerHTML = tasks.length
-    ? tasks
-        .map(
-          (task) => `
-          <article class="task">
-            <div class="row spread">
-              <strong>${escapeHtml(task.source_title || t("home.sourceLabel"))}</strong>
-              <span class="pill">${escapeHtml(translateEnum("reviewStatus", task.status, task.status))}</span>
-            </div>
-            <p class="meta">${escapeHtml(t("home.reviewTaskMeta", {
-              diffType: translateEnum("reviewDiff", task.diff_type, task.diff_type),
-              score: task.materiality_score,
-            }))}</p>
-            <p><a href="${escapeHtml(task.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(task.source_url)}</a></p>
-          </article>
-        `,
-        )
-        .join("")
-    : t("home.noReviewTasks");
+function scopeLabel(scope) {
+  const key = `intake.scope.${scope}`;
+  const translated = t(key);
+  return translated !== key ? translated : scope;
 }
 
-async function loadReviewTasks() {
+function factLabel(fact) {
+  const key = `intake.fact.${fact.key}`;
+  const translated = t(key);
+  return translated !== key ? translated : (fact.label || fact.key);
+}
+
+function resetLifeChat() {
+  intakeState.messages = [];
+  intakeState.pendingQuestionKey = null;
+  if (lifeChatMessages) lifeChatMessages.innerHTML = "";
+}
+
+function renderLifeChat() {
+  if (!lifeChatbox || !lifeChatEmpty || !lifeChatMessages) return;
+  const hasPayload = Boolean(intakeState.payload);
+  lifeChatEmpty.classList.toggle("hidden", hasPayload);
+  lifeChatbox.classList.toggle("hidden", !hasPayload);
+  if (!hasPayload) return;
+
+  lifeChatMessages.innerHTML = intakeState.messages
+    .map((message) => {
+      const roleClass = message.role === "assistant" ? "assistant" : "user";
+      return `<div class="chat-bubble ${roleClass}">${escapeHtml(message.content)}</div>`;
+    })
+    .join("");
+  lifeChatMessages.scrollTop = lifeChatMessages.scrollHeight;
+}
+
+function renderLifeIntake(payload) {
+  intakeState.payload = payload;
+  intakeState.pendingQuestionKey = payload.next_probe?.key || null;
+  lifeIntakeOutput.classList.toggle("hidden", !payload);
+  if (!payload) {
+    lifeIntakeSummary.textContent = "";
+    lifeIntakeScope.textContent = "";
+    lifeIntakeState.textContent = "";
+    lifeIntakeCategories.innerHTML = "";
+    lifeIntakeFacts.innerHTML = "";
+    lifeIntakeMissing.innerHTML = "";
+    renderLifeChat();
+    return;
+  }
+
+  lifeIntakeSummary.textContent = payload.summary || "";
+  lifeIntakeScope.textContent = scopeLabel(payload.suggested_scope || "federal");
+  lifeIntakeState.textContent = payload.applied_state_code || t("home.chooseState");
+
+  lifeIntakeCategories.innerHTML = (payload.suggested_categories || []).length
+    ? payload.suggested_categories
+        .map((category) => `<span class="chip">${escapeHtml(getCategoryLabel(category.key) || category.label)}</span>`)
+        .join("")
+    : `<span class="meta">${escapeHtml(t("home.lifeNoCategories"))}</span>`;
+
+  lifeIntakeFacts.innerHTML = (payload.structured_facts || []).length
+    ? payload.structured_facts
+        .map((fact) => `<span class="chip"><strong>${escapeHtml(factLabel(fact))}:</strong> ${escapeHtml(fact.value_label)}</span>`)
+        .join("")
+    : `<span class="meta">${escapeHtml(t("home.lifeNoFacts"))}</span>`;
+
+  lifeIntakeMissing.innerHTML = (payload.follow_up_questions || []).length
+    ? payload.follow_up_questions
+        .map((question) => `<li><strong>${escapeHtml(question.prompt)}</strong> <span class="meta">${escapeHtml(question.reason)}</span></li>`)
+        .join("")
+    : `<li>${escapeHtml(t("home.lifeNoMissing"))}</li>`;
+
+  renderLifeChat();
+}
+
+function clearLifeIntake() {
+  intakeState.description = "";
+  intakeState.payload = null;
+  intakeState.pendingQuestionKey = null;
+  lifeIntakeDescription.value = "";
+  lifeChatInput.value = "";
+  setLifeIntakeStatus("");
+  resetLifeChat();
+  renderLifeIntake(null);
+}
+
+function applyIntakeSuggestionsToForm() {
+  if (!intakeState.payload) return;
+  scopeSelect.value = intakeState.payload.suggested_scope || "federal";
+  if (intakeState.payload.applied_state_code) {
+    stateSelect.value = intakeState.payload.applied_state_code;
+  }
+  const categoryKeys = (intakeState.payload.suggested_categories || []).map((category) => category.key);
+  setSelectedCategories(categoryKeys);
+  updateStateVisibility();
+  setStateValidation("");
+  setStatus(t("home.lifeApplyDone"));
+  scrollToTopOf(startScreeningPanel);
+}
+
+function buildSessionPayload({ scope, stateCode, categories }) {
+  return {
+    scope,
+    state_code: stateCode || null,
+    categories,
+    depth_value: parseFloat(depthSlider.value),
+  };
+}
+
+async function startScreeningFlow(payload, prefillAnswers = {}) {
+  const submitBtn = startForm.querySelector("button[type='submit']");
   try {
-    const tasks = await getJson("/api/v1/admin/review-tasks");
-    renderReviewTasks(tasks);
+    setStateValidation("");
+    if (!payload.categories?.length) {
+      setStatus(t("home.selectCategory"));
+      return;
+    }
+    if (!payload.scope) {
+      setStatus(t("home.chooseScope"));
+      return;
+    }
+    if (payload.scope !== "federal" && !payload.state_code) {
+      const msg = t("home.chooseStateMsg");
+      setStatus(msg);
+      setStateValidation(msg);
+      return;
+    }
+
+    if (submitBtn) {
+      setLoading(submitBtn, true);
+      setBusyButtonText(submitBtn, true, t("home.searching"), t("home.apply"));
+    }
+
+    setActiveScope(payload.scope);
+    setStatus(payload.scope === "federal" ? t("home.creatingSession") : t("home.creatingSessionState"));
+    const session = await getJson("/api/v1/sessions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+
+    setSessionId(session.session_id);
+    let envelope = session;
+    const filteredPrefills = Object.fromEntries(
+      Object.entries(prefillAnswers || {}).filter(([, value]) => value !== null && value !== ""),
+    );
+    if (Object.keys(filteredPrefills).length) {
+      envelope = await getJson(`/api/v1/sessions/${session.session_id}/answers`, {
+        method: "POST",
+        body: JSON.stringify({ answers: filteredPrefills }),
+      });
+    }
+
+    renderQuestion(envelope.next_question);
+    setStatus(t("home.sessionLive", { sessionId: state.sessionId }));
+    if (intakeState.payload) {
+      setLifeIntakeStatus(t("home.lifeStarted"));
+    }
   } catch (error) {
-    reviewTasksNode.classList.add("empty");
-    reviewTasksNode.textContent = error.message;
-    throw error;
+    setStatus(t("home.sessionError", { error: error.message }));
+  } finally {
+    if (submitBtn) {
+      setLoading(submitBtn, false);
+      setBusyButtonText(submitBtn, false, t("home.searching"), t("home.apply"));
+    }
   }
 }
--- end Review Queue */
+
+async function analyzeLifeIntake() {
+  const description = (lifeIntakeDescription.value || "").trim();
+  if (!description) {
+    setLifeIntakeStatus(t("home.lifeDescriptionRequired"));
+    return;
+  }
+
+  try {
+    intakeState.description = description;
+    resetLifeChat();
+    setLoading(lifeIntakeAnalyzeButton, true);
+    setLifeIntakeStatus(t("home.lifeAnalyzing"));
+    const payload = await getJson("/api/v1/intake/interpret", {
+      method: "POST",
+      body: JSON.stringify({
+        description,
+        scope: scopeSelect.value || null,
+        state_code: stateSelect.value || null,
+        categories: selectedCategories(),
+        use_llm: true,
+      }),
+    });
+    intakeState.messages = payload.chat_reply ? [{ role: "assistant", content: payload.chat_reply }] : [];
+    renderLifeIntake(payload);
+    setLifeIntakeStatus(t("home.lifeAnalyzed"));
+  } catch (error) {
+    setLifeIntakeStatus(t("home.lifeInterpretError", { error: error.message }));
+  } finally {
+    setLoading(lifeIntakeAnalyzeButton, false);
+  }
+}
+
+async function sendLifeProbe(message) {
+  if (!intakeState.payload) return;
+  const trimmed = message.trim();
+  if (!trimmed) return;
+
+  try {
+    intakeState.messages.push({ role: "user", content: trimmed });
+    renderLifeChat();
+    setLoading(lifeChatForm.querySelector("button[type='submit']"), true);
+    const payload = await getJson("/api/v1/intake/probe", {
+      method: "POST",
+      body: JSON.stringify({
+        description: intakeState.description,
+        scope: intakeState.payload.suggested_scope,
+        state_code: intakeState.payload.applied_state_code,
+        categories: (intakeState.payload.suggested_categories || []).map((category) => category.key),
+        current_facts: intakeState.payload.current_facts || {},
+        pending_question_key: intakeState.pendingQuestionKey,
+        messages: intakeState.messages,
+        use_llm: true,
+      }),
+    });
+    if (payload.chat_reply) {
+      intakeState.messages.push({ role: "assistant", content: payload.chat_reply });
+    }
+    renderLifeIntake(payload);
+    setLifeIntakeStatus(t("home.lifeProbeUpdated"));
+  } catch (error) {
+    setLifeIntakeStatus(t("home.lifeProbeError", { error: error.message }));
+  } finally {
+    lifeChatInput.value = "";
+    setLoading(lifeChatForm.querySelector("button[type='submit']"), false);
+  }
+}
 
 function resetApp() {
   setSessionId(null);
@@ -228,59 +463,13 @@ function resetApp() {
 
 startForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const submitBtn = startForm.querySelector("button[type='submit']");
-  if (submitBtn && submitBtn.disabled) return;
-  try {
-    setStateValidation("");
-    const categories = selectedCategories();
-    if (!categories.length) {
-      setStatus(t("home.selectCategory"));
-      return;
-    }
-    if (!scopeSelect.value) {
-      setStatus(t("home.chooseScope"));
-      scrollToTopOf(startScreeningPanel);
-      scopeSelect.focus();
-      return;
-    }
-    if (scopeSelect.value !== "federal" && !stateSelect.value) {
-      const msg = t("home.chooseStateMsg");
-      setStatus(msg);
-      setStateValidation(msg);
-      scrollToTopOf(startScreeningPanel);
-      stateSelect.focus();
-      return;
-    }
-
-    if (submitBtn) {
-      setLoading(submitBtn, true);
-      setBusyButtonText(submitBtn, true, t("home.searching"), t("home.apply"));
-    }
-
-    const hasState = scopeSelect.value !== "federal" && stateSelect.value;
-    setStatus(hasState ? t("home.creatingSessionState") : t("home.creatingSession"));
-    const payload = {
+  await startScreeningFlow(
+    buildSessionPayload({
       scope: scopeSelect.value,
-      state_code: stateSelect.value || null,
-      categories,
-      depth_value: parseFloat(depthSlider.value),
-    };
-    setActiveScope(payload.scope);
-    const session = await getJson("/api/v1/sessions", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    setSessionId(session.session_id);
-    renderQuestion(session.next_question);
-    setStatus(t("home.sessionLive", { sessionId: state.sessionId }));
-  } catch (error) {
-    setStatus(t("home.sessionError", { error: error.message }));
-  } finally {
-    if (submitBtn) {
-      setLoading(submitBtn, false);
-      setBusyButtonText(submitBtn, false, t("home.searching"), t("home.apply"));
-    }
-  }
+      stateCode: stateSelect.value,
+      categories: selectedCategories(),
+    }),
+  );
 });
 
 questionForm.addEventListener("submit", async (event) => {
@@ -313,12 +502,35 @@ questionForm.addEventListener("submit", async (event) => {
   }
 });
 
+lifeIntakeAnalyzeButton?.addEventListener("click", analyzeLifeIntake);
+lifeIntakeClearButton?.addEventListener("click", clearLifeIntake);
+lifeIntakeApplyButton?.addEventListener("click", applyIntakeSuggestionsToForm);
+lifeIntakeStartButton?.addEventListener("click", async () => {
+  if (!intakeState.payload) return;
+  applyIntakeSuggestionsToForm();
+  await startScreeningFlow(
+    buildSessionPayload({
+      scope: intakeState.payload.suggested_scope,
+      stateCode: intakeState.payload.applied_state_code,
+      categories: (intakeState.payload.suggested_categories || []).map((category) => category.key),
+    }),
+    intakeState.payload.prefill_answers || {},
+  );
+});
+
+lifeChatForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await sendLifeProbe(lifeChatInput.value || "");
+});
+
 document.querySelector("#show-results").addEventListener("click", () => {
   window.location.href = "/results";
 });
 
 document.querySelector("#select-all-categories").addEventListener("click", () => setAllCategories(true));
 document.querySelector("#clear-categories").addEventListener("click", () => setAllCategories(false));
+document.querySelector("#reset-button").addEventListener("click", resetApp);
+
 scopeSelect.addEventListener("change", updateStateVisibility);
 stateSelect.addEventListener("change", () => {
   if (stateSelect.value) setStateValidation("");
@@ -332,6 +544,7 @@ depthPills.forEach((pill) => {
     updateDepthDescription();
   });
 });
+
 saveAdminKeyButton?.addEventListener("click", saveAdminKeyFromInput);
 clearAdminKeyButton?.addEventListener("click", () => {
   if (!adminKeyInput) return;
@@ -345,12 +558,11 @@ adminKeyInput?.addEventListener("keydown", (event) => {
   }
 });
 
-document.querySelector("#reset-button").addEventListener("click", resetApp);
-
 document.addEventListener("localechange", () => {
   renderCategories();
   updateDepthDescription();
   loadStates().catch((error) => setStatus(error.message));
+  renderLifeIntake(intakeState.payload);
   if (state.currentQuestion) {
     renderQuestion(state.currentQuestion);
   } else if (state.isScreeningFinished) {
@@ -358,17 +570,10 @@ document.addEventListener("localechange", () => {
   } else {
     questionEmpty.textContent = t("home.questionEmpty");
   }
-  /* -- Review Queue locale update commented out --
-  if (state.latestReviewTasks) {
-    renderReviewTasks(state.latestReviewTasks);
-  } else if (reviewTasksNode.classList.contains("empty")) {
-    reviewTasksNode.textContent = t("home.noReviewTasks");
-  }
-  */
 });
 
 renderCategories();
-loadStates()
-  .catch((error) => setStatus(error.message));
+loadStates().catch((error) => setStatus(error.message));
 updateStateVisibility();
 updateDepthDescription();
+renderLifeIntake(null);

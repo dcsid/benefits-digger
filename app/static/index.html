@@ -28,6 +28,96 @@
         </p>
       </section>
 
+      <section class="panel wide" id="life-intake-panel">
+        <div class="row spread">
+          <div>
+            <p class="eyebrow" data-i18n="home.lifeIntakePill">Life-event intake</p>
+            <h2 data-i18n="home.lifeIntakeTitle">Describe what is going on</h2>
+          </div>
+        </div>
+        <div class="intake-layout">
+          <div class="stack">
+            <label>
+              <span data-i18n="home.lifeIntakeLabel">Tell us about the struggle in your own words</span>
+              <textarea
+                id="life-intake-description"
+                rows="5"
+                data-i18n="home.lifeIntakePlaceholder"
+                data-i18n-attr="placeholder"
+                placeholder="Example: I lost my job, I’m behind on rent, and I’m trying to figure out whether there is help for food and medical coverage."
+              ></textarea>
+            </label>
+            <p class="meta" data-i18n="home.lifeIntakeHint">
+              You do not need to classify the problem first. We will turn your description into suggested categories, likely facts, and the next questions that matter most.
+            </p>
+            <div class="row form-actions">
+              <button type="button" id="life-intake-analyze" data-i18n="home.lifeIntakeAnalyze">Analyze my situation</button>
+              <button type="button" id="life-intake-clear" class="ghost" data-i18n="home.lifeIntakeClear">Clear intake</button>
+            </div>
+            <p id="life-intake-status" class="status"></p>
+
+            <div id="life-intake-output" class="stack hidden">
+              <article class="intake-summary-card">
+                <strong data-i18n="home.lifeSummaryTitle">What I heard</strong>
+                <p id="life-intake-summary" class="meta"></p>
+              </article>
+
+              <div class="intake-summary-grid">
+                <article class="mini-panel">
+                  <strong data-i18n="home.lifeSuggestedScope">Suggested scope</strong>
+                  <p id="life-intake-scope" class="meta"></p>
+                </article>
+                <article class="mini-panel">
+                  <strong data-i18n="home.lifeSuggestedState">Suggested state</strong>
+                  <p id="life-intake-state" class="meta"></p>
+                </article>
+              </div>
+
+              <article class="mini-panel">
+                <strong data-i18n="home.lifeCategoriesTitle">Suggested benefit areas</strong>
+                <div id="life-intake-categories" class="chip-row"></div>
+              </article>
+
+              <article class="mini-panel">
+                <strong data-i18n="home.lifeFactsTitle">Structured facts so far</strong>
+                <div id="life-intake-facts" class="chip-row"></div>
+              </article>
+
+              <article class="mini-panel">
+                <strong data-i18n="home.lifeMissingTitle">Still useful to ask</strong>
+                <ul id="life-intake-missing" class="reason-list"></ul>
+              </article>
+
+              <div class="row form-actions">
+                <button type="button" id="life-intake-apply" class="ghost" data-i18n="home.lifeApply">Apply these suggestions to the screener</button>
+                <button type="button" id="life-intake-start" data-i18n="home.lifeStart">Start screening from this intake</button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="mini-panel intake-chat-panel">
+            <strong data-i18n="home.lifeChatTitle">Probe for more detail</strong>
+            <p class="meta" data-i18n="home.lifeChatHint">
+              After the first intake pass, this small chatbox asks one short follow-up at a time and updates the structured facts above.
+            </p>
+            <div id="life-chat-empty" class="empty" data-i18n="home.lifeChatEmpty">Run the intake first to unlock the follow-up chat.</div>
+            <div id="life-chatbox" class="life-chatbox hidden">
+              <div id="life-chat-messages" class="life-chat-messages"></div>
+              <form id="life-chat-form" class="stack">
+                <input
+                  id="life-chat-input"
+                  type="text"
+                  data-i18n="home.lifeChatPlaceholder"
+                  data-i18n-attr="placeholder"
+                  placeholder="Type a short reply like “yes”, “I’m in New York”, or “I’m in school right now.”"
+                />
+                <button type="submit" id="life-chat-send" data-i18n="home.lifeChatSend">Send follow-up</button>
+              </form>
+            </div>
+          </aside>
+        </div>
+      </section>
+
       <section class="panel" id="start-screening-panel">
         <h2 data-i18n="home.startScreening">Start Screening</h2>
         <form id="start-form" class="stack">

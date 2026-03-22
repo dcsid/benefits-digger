@@ -667,6 +667,73 @@ def test_hybrid_explorer_supports_plain_english_description_without_llm() -> Non
         )
 
 
+def test_life_event_intake_interprets_story_into_categories_and_facts() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/intake/interpret",
+            json={
+                "description": "I lost my job in California, I'm behind on rent, and I need help with groceries.",
+                "use_llm": False,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+
+        category_keys = [item["key"] for item in payload["suggested_categories"]]
+        fact_keys = {item["key"] for item in payload["structured_facts"]}
+
+        assert payload["applied_state_code"] == "CA"
+        assert payload["suggested_scope"] == "both"
+        assert "jobs_unemployment" in category_keys
+        assert "housing_utilities" in category_keys
+        assert "food" in category_keys
+        assert "recent_job_loss" in fact_keys
+        assert "housing_urgency" in fact_keys
+        assert payload["next_probe"] is not None
+
+
+def test_life_event_probe_updates_state_and_prefill_answers() -> None:
+    with TestClient(app) as client:
+        initial = client.post(
+            "/api/v1/intake/interpret",
+            json={
+                "description": "I cannot work because of my disability and I need help.",
+                "use_llm": False,
+            },
+        )
+        assert initial.status_code == 200
+        first_payload = initial.json()
+
+        assert "applicant_disability" in first_payload["prefill_answers"]
+        assert first_payload["prefill_answers"]["applicant_disability"] == "Yes"
+        assert first_payload["prefill_answers"]["applicant_ability_to_work"] == "Yes"
+
+        probe = client.post(
+            "/api/v1/intake/probe",
+            json={
+                "description": "I cannot work because of my disability and I need help.",
+                "scope": first_payload["suggested_scope"],
+                "state_code": first_payload["applied_state_code"],
+                "categories": [item["key"] for item in first_payload["suggested_categories"]],
+                "current_facts": first_payload["current_facts"],
+                "pending_question_key": "state_code",
+                "messages": [
+                    {"role": "assistant", "content": first_payload["chat_reply"]},
+                    {"role": "user", "content": "I live in New York."},
+                ],
+                "use_llm": False,
+            },
+        )
+        assert probe.status_code == 200
+        probe_payload = probe.json()
+        fact_keys = {item["key"] for item in probe_payload["structured_facts"]}
+
+        assert probe_payload["applied_state_code"] == "NY"
+        assert probe_payload["suggested_scope"] == "both"
+        assert "state_code" in fact_keys
+        assert probe_payload["current_facts"]["state_code"] == "NY"
+
+
 def test_selected_state_suppresses_redundant_residency_questions_across_depths() -> None:
     seed_state_program_with_redundant_residency_rule()
 

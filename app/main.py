@@ -10,8 +10,17 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import Base, SessionLocal, engine, get_db
 from app.hybrid_explorer import hybrid_explorer_search
+from app.intake_copilot import interpret_life_event_intake
 from app.models import ScreeningSession
-from app.schemas import AnswerPayload, ComparePayload, ExplorerSearchPayload, SessionCreatePayload, SessionEnvelope
+from app.schemas import (
+    AnswerPayload,
+    ComparePayload,
+    ExplorerSearchPayload,
+    IntakeInterpretPayload,
+    IntakeProbePayload,
+    SessionCreatePayload,
+    SessionEnvelope,
+)
 from app.services import (
     bootstrap_catalog,
     compare_scenarios,
@@ -190,6 +199,33 @@ def explorer_search(payload: ExplorerSearchPayload, db: Session = Depends(get_db
         state_code=payload.state_code,
         categories=payload.categories,
         limit=payload.limit,
+        use_llm=payload.use_llm,
+    )
+
+
+@app.post(f"{settings.api_v1_prefix}/intake/interpret")
+def life_event_intake(payload: IntakeInterpretPayload, db: Session = Depends(get_db)) -> dict:
+    return interpret_life_event_intake(
+        db,
+        description=payload.description,
+        scope=payload.scope,
+        state_code=payload.state_code,
+        categories=payload.categories,
+        use_llm=payload.use_llm,
+    )
+
+
+@app.post(f"{settings.api_v1_prefix}/intake/probe")
+def life_event_probe(payload: IntakeProbePayload, db: Session = Depends(get_db)) -> dict:
+    return interpret_life_event_intake(
+        db,
+        description=payload.description,
+        scope=payload.scope,
+        state_code=payload.state_code,
+        categories=payload.categories,
+        current_facts=payload.current_facts,
+        messages=[message.model_dump() for message in payload.messages],
+        pending_question_key=payload.pending_question_key,
         use_llm=payload.use_llm,
     )
 

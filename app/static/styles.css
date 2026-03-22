@@ -492,6 +492,80 @@ fieldset {
   gap: 0.5rem;
 }
 
+.intake-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.9fr);
+  align-items: start;
+}
+
+.intake-summary-card,
+.mini-panel {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.intake-summary-grid {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.chip {
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  background: rgba(11, 110, 79, 0.1);
+  border: 1px solid rgba(11, 110, 79, 0.14);
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.intake-chat-panel {
+  position: sticky;
+  top: 1rem;
+}
+
+.life-chatbox {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.life-chat-messages {
+  max-height: 280px;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.65rem;
+  padding-right: 0.25rem;
+}
+
+.chat-bubble {
+  max-width: 92%;
+  padding: 0.75rem 0.9rem;
+  border-radius: 16px;
+  line-height: 1.35;
+}
+
+.chat-bubble.assistant {
+  background: rgba(11, 110, 79, 0.1);
+  border: 1px solid rgba(11, 110, 79, 0.16);
+}
+
+.chat-bubble.user {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+}
+
 a {
   color: var(--accent);
 }
@@ -627,6 +701,15 @@ button:disabled {
   .results-grid,
   .metric-grid {
     grid-template-columns: 1fr;
+  }
+
+  .intake-layout,
+  .intake-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .intake-chat-panel {
+    position: static;
   }
 }
 

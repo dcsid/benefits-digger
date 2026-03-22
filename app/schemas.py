@@ -82,3 +82,27 @@ class ExplorerSearchPayload(BaseModel):
     categories: list[str] = Field(default_factory=list)
     limit: int = Field(default=20, ge=1, le=100)
     use_llm: bool = True
+
+
+class IntakeMessageInput(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
+class IntakeInterpretPayload(BaseModel):
+    description: str = ""
+    scope: Optional[Literal["federal", "state", "both"]] = None
+    state_code: Optional[str] = None
+    categories: list[str] = Field(default_factory=list)
+    use_llm: bool = True
+
+
+class IntakeProbePayload(BaseModel):
+    description: str = ""
+    scope: Optional[Literal["federal", "state", "both"]] = None
+    state_code: Optional[str] = None
+    categories: list[str] = Field(default_factory=list)
+    current_facts: dict[str, Any] = Field(default_factory=dict)
+    messages: list[IntakeMessageInput] = Field(default_factory=list)
+    pending_question_key: Optional[str] = None
+    use_llm: bool = True
