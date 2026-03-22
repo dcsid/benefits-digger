@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Benefits Digger System Diagram</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f2ea;
+        --panel: rgba(255, 255, 255, 0.88);
+        --panel-strong: #ffffff;
+        --ink: #163028;
+        --muted: #5d6d65;
+        --line: rgba(22, 48, 40, 0.12);
+        --accent: #1e6b4a;
+        --accent-soft: rgba(30, 107, 74, 0.12);
+        --accent-2: #c8622e;
+        --shadow: 0 18px 50px rgba(34, 28, 20, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "SF Pro Text", "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(200, 98, 46, 0.10), transparent 32%),
+          radial-gradient(circle at top right, rgba(30, 107, 74, 0.12), transparent 30%),
+          var(--bg);
+        color: var(--ink);
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      .page {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 28px;
+      }
+
+      .hero {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.72));
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        padding: 28px;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        font-size: 0.78rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(2rem, 3vw, 3.2rem);
+        line-height: 1.04;
+      }
+
+      .lede {
+        max-width: 920px;
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1.65;
+        color: var(--muted);
+      }
+
+      .hero-meta {
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-size: 0.86rem;
+        font-weight: 600;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr) 360px;
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .panel-inner {
+        padding: 22px;
+      }
+
+      .section-title {
+        margin: 0 0 10px;
+        font-size: 0.9rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .flow-switcher {
+        display: grid;
+        gap: 10px;
+      }
+
+      .flow-button {
+        width: 100%;
+        text-align: left;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px 14px 13px;
+        background: rgba(255, 255, 255, 0.7);
+        color: var(--ink);
+        cursor: pointer;
+        transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+      }
+
+      .flow-button:hover {
+        transform: translateY(-1px);
+        border-color: rgba(30, 107, 74, 0.28);
+      }
+
+      .flow-button.active {
+        background: linear-gradient(135deg, rgba(30, 107, 74, 0.16), rgba(255, 255, 255, 0.94));
+        border-color: rgba(30, 107, 74, 0.36);
+      }
+
+      .flow-button strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 0.96rem;
+      }
+
+      .flow-button span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.84rem;
+        line-height: 1.45;
+      }
+
+      .diagram-wrap {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 242, 234, 0.75));
+      }
+
+      .diagram-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+
+      .diagram-toolbar p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .legend .pill {
+        font-size: 0.78rem;
+      }
+
+      .flow-view {
+        display: none;
+      }
+
+      .flow-view.active {
+        display: block;
+      }
+
+      .flow-view h2 {
+        margin: 0 0 6px;
+        font-size: 1.5rem;
+      }
+
+      .flow-subtitle {
+        margin: 0 0 18px;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .diagram-stack {
+        display: grid;
+        gap: 18px;
+      }
+
+      .flow-row {
+        display: flex;
+        align-items: stretch;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .flow-column {
+        display: grid;
+        gap: 10px;
+        min-width: 220px;
+        flex: 1 1 240px;
+      }
+
+      .node {
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 14px;
+        min-height: 106px;
+        background: var(--panel-strong);
+        cursor: pointer;
+        text-align: left;
+        box-shadow: 0 12px 30px rgba(34, 28, 20, 0.06);
+        transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      }
+
+      .node:hover {
+        transform: translateY(-2px);
+        border-color: rgba(30, 107, 74, 0.35);
+      }
+
+      .node.active {
+        border-color: rgba(30, 107, 74, 0.55);
+        background: linear-gradient(180deg, rgba(30, 107, 74, 0.10), rgba(255, 255, 255, 0.98));
+        box-shadow: 0 18px 38px rgba(30, 107, 74, 0.12);
+      }
+
+      .node small {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--accent);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.7rem;
+      }
+
+      .node strong {
+        display: block;
+        font-size: 1rem;
+        margin-bottom: 6px;
+      }
+
+      .node p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.48;
+        font-size: 0.88rem;
+      }
+
+      .arrow {
+        align-self: center;
+        color: var(--accent);
+        font-size: 1.35rem;
+        font-weight: 700;
+        padding: 0 4px;
+      }
+
+      .branch-label {
+        margin: -2px 0 0;
+        font-size: 0.8rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .detail-card h2 {
+        margin: 0;
+        font-size: 1.45rem;
+      }
+
+      .detail-card p {
+        color: var(--muted);
+        line-height: 1.62;
+      }
+
+      .detail-meta {
+        display: grid;
+        gap: 14px;
+      }
+
+      .detail-block {
+        border-top: 1px solid var(--line);
+        padding-top: 14px;
+      }
+
+      .detail-block h3 {
+        margin: 0 0 8px;
+        font-size: 0.88rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .detail-list {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+
+      .detail-list li + li {
+        margin-top: 6px;
+      }
+
+      .doc-links {
+        margin-top: 16px;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+
+      @media (max-width: 1180px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          padding: 16px;
+        }
+
+        .hero,
+        .panel-inner {
+          padding: 18px;
+        }
+
+        .flow-row {
+          flex-direction: column;
+        }
+
+        .arrow {
+          align-self: flex-start;
+          padding-left: 6px;
+          transform: rotate(90deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <section class="hero">
+        <p class="eyebrow">Benefits Digger Architecture</p>
+        <h1>Interactive system diagram for the current product</h1>
+        <p class="lede">
+          This diagram shows how the product works end to end: official-source ingestion, crawl enrichment, Gemini-assisted state extraction, runtime screening, the hybrid Explorer, and source-refresh review flow. Use the view switcher on the left and click any node to inspect what it does, what it reads, and where it lives in the codebase.
+        </p>
+        <div class="hero-meta">
+          <span class="pill">Interactive browser doc</span>
+          <span class="pill">Current-state architecture</span>
+          <span class="pill">User flow + data flow + maintenance flow</span>
+        </div>
+      </section>
+
+      <div class="layout">
+        <aside class="panel">
+          <div class="panel-inner">
+            <p class="section-title">Views</p>
+            <div class="flow-switcher">
+              <button class="flow-button active" data-flow-target="overview">
+                <strong>Overview</strong>
+                <span>The main product surface from Home through Results, Dashboard, What-If, and Explorer.</span>
+              </button>
+              <button class="flow-button" data-flow-target="ingestion">
+                <strong>Ingestion</strong>
+                <span>How official federal and state data become local programs, rules, questions, and sources.</span>
+              </button>
+              <button class="flow-button" data-flow-target="screening">
+                <strong>Runtime Screening</strong>
+                <span>How breadth, depth, variants, normalization, and rule evaluation work during a session.</span>
+              </button>
+              <button class="flow-button" data-flow-target="explorer">
+                <strong>Hybrid Explorer</strong>
+                <span>How plain-English discovery and grounded local catalog search fit together.</span>
+              </button>
+              <button class="flow-button" data-flow-target="maintenance">
+                <strong>Source Refresh</strong>
+                <span>How official-source refresh, snapshots, diffs, and review tasks are created.</span>
+              </button>
+            </div>
+            <div class="doc-links">
+              Related docs:
+              <a href="./technical-spec.md">technical-spec.md</a>,
+              <a href="./feature-overview.md">feature-overview.md</a>,
+              <a href="./current-prd.md">current-prd.md</a>
+            </div>
+          </div>
+        </aside>
+
+        <main class="panel diagram-wrap">
+          <div class="panel-inner">
+            <div class="diagram-toolbar">
+              <p>Click any box to inspect responsibilities, inputs, outputs, and key files.</p>
+              <div class="legend">
+                <span class="pill">Green: primary app flow</span>
+                <span class="pill">Orange: source or AI assist</span>
+                <span class="pill">White: stored/local runtime component</span>
+              </div>
+            </div>
+
+            <section class="flow-view active" data-flow="overview">
+              <h2>Overview</h2>
+              <p class="flow-subtitle">
+                This is the high-level product map. It shows the main user surfaces and the shared backend that powers them.
+              </p>
+              <div class="diagram-stack">
+                <div class="flow-row">
+                  <button class="node" data-node="home-ui">
+                    <small>User Entry</small>
+                    <strong>Home UI</strong>
+                    <p>Select scope, state, categories, breadth, and depth. Start screening.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="session-api">
+                    <small>Backend</small>
+                    <strong>Session API</strong>
+                    <p>Create a session, return the next question, and keep anonymous state in SQLite.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="question-engine">
+                    <small>Runtime Logic</small>
+                    <strong>Question Engine</strong>
+                    <p>Chooses the next best unanswered question using breadth policy and local program rules.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="results-engine">
+                    <small>Runtime Logic</small>
+                    <strong>Results Engine</strong>
+                    <p>Evaluates rules, computes confidence, and returns source-backed result cards.</p>
+                  </button>
+                </div>
+
+                <div class="flow-row">
+                  <div class="flow-column">
+                    <p class="branch-label">Primary result surfaces</p>
+                    <button class="node" data-node="results-page">
+                      <small>User Surface</small>
+                      <strong>Results Page</strong>
+                      <p>Federal and state results, reasons, missing facts, official links, and docs.</p>
+                    </button>
+                    <button class="node" data-node="dashboard-page">
+                      <small>User Surface</small>
+                      <strong>Planning Dashboard</strong>
+                      <p>Benefit stack, top missing facts, action plan, source hub, and document checklist.</p>
+                    </button>
+                    <button class="node" data-node="whatif-page">
+                      <small>User Surface</small>
+                      <strong>What-If Lab</strong>
+                      <p>Scenario comparison without overwriting the saved session.</p>
+                    </button>
+                    <button class="node" data-node="explorer-page">
+                      <small>User Surface</small>
+                      <strong>Program Explorer</strong>
+                      <p>Browse or search the grounded program catalog with optional plain-English interpretation.</p>
+                    </button>
+                  </div>
+                  <div class="flow-column">
+                    <p class="branch-label">Shared app foundation</p>
+                    <button class="node" data-node="catalog-db">
+                      <small>Data Store</small>
+                      <strong>Local Catalog DB</strong>
+                      <p>Programs, versions, questions, variants, rules, sources, snapshots, sessions, and answers.</p>
+                    </button>
+                    <button class="node" data-node="i18n-layer">
+                      <small>Frontend Shared Layer</small>
+                      <strong>Shared UI + i18n</strong>
+                      <p>Shared request helpers, result rendering, translation lookup, and session state.</p>
+                    </button>
+                    <button class="node" data-node="admin-tools">
+                      <small>Ops Surface</small>
+                      <strong>Refresh + Review</strong>
+                      <p>Manual source refresh and review queue for source changes.</p>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="flow-view" data-flow="ingestion">
+              <h2>Ingestion</h2>
+              <p class="flow-subtitle">
+                This is how official source data becomes the local grounded catalog that the runtime app uses. Runtime screening does not scrape live pages during the user session.
+              </p>
+              <div class="diagram-stack">
+                <div class="flow-row">
+                  <button class="node" data-node="federal-feed">
+                    <small>Official Seed</small>
+                    <strong>USA.gov Federal Feed</strong>
+                    <p>Structured federal benefits source used for deterministic federal catalog ingestion.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="federal-sync">
+                    <small>Parser</small>
+                    <strong>Federal Sync</strong>
+                    <p>Normalizes programs, questions, rules, amount data, and official source references.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="catalog-db">
+                    <small>Data Store</small>
+                    <strong>Local Catalog DB</strong>
+                    <p>Published federal program records and related question/rule structures.</p>
+                  </button>
+                </div>
+
+                <div class="flow-row">
+                  <button class="node" data-node="state-directory">
+                    <small>Official Seed</small>
+                    <strong>USA.gov State Directory</strong>
+                    <p>Official state social-service entry points used as state discovery seeds.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="crawler">
+                    <small>Crawl Layer</small>
+                    <strong>Bounded Government Crawler</strong>
+                    <p>Crawls first-party official pages on approved government domains with capped depth and page count.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="gemini-filter">
+                    <small>AI Assist</small>
+                    <strong>Gemini Relevance Filter</strong>
+                    <p>Filters crawled official pages down to the ones most relevant to benefits content.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="gemini-extract">
+                    <small>AI Assist</small>
+                    <strong>Gemini Grounded Extraction</strong>
+                    <p>Generates structured state programs, rules, and question variants from official crawled pages.</p>
+                  </button>
+                </div>
+
+                <div class="flow-row">
+                  <button class="node" data-node="snapshots">
+                    <small>Traceability</small>
+                    <strong>Snapshots + Diffs</strong>
+                    <p>Every synced or crawled source gets hashed, snapshotted, and checked for changes.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="review-tasks">
+                    <small>Traceability</small>
+                    <strong>Review Tasks</strong>
+                    <p>Source changes create review queue items instead of silently changing the product.</p>
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="flow-view" data-flow="screening">
+              <h2>Runtime Screening</h2>
+              <p class="flow-subtitle">
+                This is the current runtime algorithm. Breadth controls exploration length. Depth controls question specificity and variant selection.
+              </p>
+              <div class="diagram-stack">
+                <div class="flow-row">
+                  <button class="node" data-node="session-create-payload">
+                    <small>Input</small>
+                    <strong>Session Controls</strong>
+                    <p>Scope, state, categories, breadth value, and depth value are submitted to create a session.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="session-store">
+                    <small>Session State</small>
+                    <strong>Stored Session</strong>
+                    <p>The session persists anonymous screening state in the database.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="candidate-filter">
+                    <small>Runtime Logic</small>
+                    <strong>Candidate Program Filter</strong>
+                    <p>Limits the active program set by scope, selected state, and chosen categories.</p>
+                  </button>
+                </div>
+
+                <div class="flow-row">
+                  <button class="node" data-node="breadth-policy">
+                    <small>Control Policy</small>
+                    <strong>Breadth Policy</strong>
+                    <p>Controls max answers, sensitivity unlocks, and how widely the engine keeps exploring.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="question-scorer">
+                    <small>Runtime Logic</small>
+                    <strong>Question Scorer</strong>
+                    <p>Scores unanswered questions across candidate programs and picks the highest-value next step.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="depth-policy">
+                    <small>Control Policy</small>
+                    <strong>Depth Variant Resolver</strong>
+                    <p>Chooses whether a question is broad or detailed, like yes/no versus exact numeric input.</p>
+                  </button>
+                </div>
+
+                <div class="flow-row">
+                  <button class="node" data-node="question-response">
+                    <small>Output</small>
+                    <strong>Question Payload</strong>
+                    <p>Prompt, hint, input type, sensitivity, and options are returned to the browser.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="answer-normalizer">
+                    <small>Runtime Logic</small>
+                    <strong>Answer Normalizer</strong>
+                    <p>Detailed answers can be normalized back into the canonical forms expected by rules.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="rule-evaluator">
+                    <small>Runtime Logic</small>
+                    <strong>Rule Evaluator</strong>
+                    <p>Applies stored eligibility rules and computes likely, possible, unclear, or ineligible states.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="plan-builder">
+                    <small>Runtime Logic</small>
+                    <strong>Plan Builder</strong>
+                    <p>Builds dashboard summaries, action steps, and top missing-fact priorities from results.</p>
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="flow-view" data-flow="explorer">
+              <h2>Hybrid Explorer</h2>
+              <p class="flow-subtitle">
+                Explorer is grounded search. It can use Gemini to interpret a need description, but it still searches the stored local catalog rather than live-crawling the web.
+              </p>
+              <div class="diagram-stack">
+                <div class="flow-row">
+                  <button class="node" data-node="explorer-input">
+                    <small>User Input</small>
+                    <strong>Keyword + Need Description</strong>
+                    <p>Users can type exact program keywords or describe their life situation in plain English.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="explorer-interpretation">
+                    <small>Interpretation Layer</small>
+                    <strong>Heuristic or Gemini Intent Parse</strong>
+                    <p>Extracts likely state, category, and search terms from the query.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="explorer-search">
+                    <small>Grounded Search</small>
+                    <strong>Local Catalog Search</strong>
+                    <p>Searches the stored program catalog using the interpreted hints and any exact query text.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="explorer-results-node">
+                    <small>User Output</small>
+                    <strong>Ranked Explorer Results</strong>
+                    <p>Returns source-backed program cards, match reasons, and official links.</p>
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="flow-view" data-flow="maintenance">
+              <h2>Source Refresh and Review</h2>
+              <p class="flow-subtitle">
+                This is the operations path. It keeps source data current and makes source changes visible instead of hidden.
+              </p>
+              <div class="diagram-stack">
+                <div class="flow-row">
+                  <button class="node" data-node="sync-button-node">
+                    <small>Operator Action</small>
+                    <strong>Refresh Official Sources</strong>
+                    <p>Manual trigger for a new remote sync and crawl-backed enrichment pass.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="admin-sync-endpoint">
+                    <small>Backend</small>
+                    <strong>Admin Sync Endpoint</strong>
+                    <p>Protected endpoint that runs the source refresh pipeline and returns summary counts.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="sync-pipeline">
+                    <small>Pipeline</small>
+                    <strong>Remote Sync Pipeline</strong>
+                    <p>Refreshes federal feed, state directory, crawl enrichment, and related catalog records.</p>
+                  </button>
+                </div>
+
+                <div class="flow-row">
+                  <button class="node" data-node="snapshot-diff-node">
+                    <small>Traceability</small>
+                    <strong>Snapshot and Diff</strong>
+                    <p>Compares current source snapshots against previous ones using content hashes and metadata.</p>
+                  </button>
+                  <div class="arrow">→</div>
+                  <button class="node" data-node="review-queue-node">
+                    <small>Ops Output</small>
+                    <strong>Review Queue</strong>
+                    <p>Shows reviewable source changes with URLs, diff type, and materiality score.</p>
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+
+        <aside class="panel">
+          <div class="panel-inner detail-card">
+            <p class="section-title">Node Details</p>
+            <h2 id="detail-title">Home UI</h2>
+            <p id="detail-summary">
+              The Home page is the main user entry point. It collects scope, state, categories, breadth, and depth, then starts a screening session.
+            </p>
+            <div class="detail-meta">
+              <div class="detail-block">
+                <h3>What It Does</h3>
+                <ul id="detail-responsibilities" class="detail-list"></ul>
+              </div>
+              <div class="detail-block">
+                <h3>Inputs / Outputs</h3>
+                <ul id="detail-io" class="detail-list"></ul>
+              </div>
+              <div class="detail-block">
+                <h3>Key Files</h3>
+                <ul id="detail-files" class="detail-list"></ul>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <script>
+      const nodeDetails = {
+        "home-ui": {
+          title: "Home UI",
+          summary: "The Home page is the main user entry point. It collects session controls and launches screening.",
+          responsibilities: [
+            "Shows scope, state, category, breadth, and depth controls.",
+            "Lets the user start screening and answer the live question flow.",
+            "Hosts the review queue and manual source-refresh controls."
+          ],
+          io: [
+            "Input: user selections for scope, state, categories, breadth, and depth.",
+            "Output: POST to session creation and answer endpoints."
+          ],
+          files: [
+            "app/static/index.html",
+            "app/static/home.js",
+            "app/static/shared.js"
+          ]
+        },
+        "session-api": {
+          title: "Session API",
+          summary: "The session API creates anonymous screening sessions and returns the first question payload.",
+          responsibilities: [
+            "Validates the session payload.",
+            "Creates a new screening session row.",
+            "Returns the next question and provisional result count."
+          ],
+          io: [
+            "Input: POST /api/v1/sessions",
+            "Output: session_id, next_question, provisional_result_count"
+          ],
+          files: [
+            "app/main.py",
+            "app/schemas.py",
+            "app/services.py"
+          ]
+        },
+        "question-engine": {
+          title: "Question Engine",
+          summary: "The runtime question engine picks the next best question from the local catalog.",
+          responsibilities: [
+            "Filters candidate programs for the current session.",
+            "Scores unanswered questions across those candidate programs.",
+            "Stops when the breadth policy says the session has gone far enough."
+          ],
+          io: [
+            "Input: session, answers, local rules, breadth policy",
+            "Output: next question key"
+          ],
+          files: [
+            "app/services.py"
+          ]
+        },
+        "results-engine": {
+          title: "Results Engine",
+          summary: "The results engine evaluates stored rules against session answers and turns them into explainable program cards.",
+          responsibilities: [
+            "Evaluates rule outcomes per program.",
+            "Builds confidence and certainty breakdowns.",
+            "Attaches official source links, application links, and documents."
+          ],
+          io: [
+            "Input: answers, programs, versions, rules, sources",
+            "Output: federal_results and state_results payloads"
+          ],
+          files: [
+            "app/services.py",
+            "app/rules.py"
+          ]
+        },
+        "results-page": {
+          title: "Results Page",
+          summary: "The Results page shows federal and state matches separately with reasons, missing facts, documents, and official links.",
+          responsibilities: [
+            "Renders result cards using shared UI logic.",
+            "Supports print and PDF export.",
+            "Persists document checklist state in the browser."
+          ],
+          io: [
+            "Input: GET /api/v1/sessions/{id}/results",
+            "Output: user-facing result cards"
+          ],
+          files: [
+            "app/static/results.html",
+            "app/static/results-page.js",
+            "app/static/shared.js"
+          ]
+        },
+        "dashboard-page": {
+          title: "Planning Dashboard",
+          summary: "The dashboard turns the current result set into a more actionable planning summary.",
+          responsibilities: [
+            "Shows overview metrics and grouped benefit stack data.",
+            "Highlights top missing facts and next actions.",
+            "Builds a source hub and document checklist view."
+          ],
+          io: [
+            "Input: GET /api/v1/sessions/{id}/plan",
+            "Output: planning payload rendered for the browser"
+          ],
+          files: [
+            "app/static/dashboard.html",
+            "app/static/dashboard.js",
+            "app/services.py"
+          ]
+        },
+        "whatif-page": {
+          title: "What-If Lab",
+          summary: "The What-If Lab compares scenario overrides without mutating the base screening session.",
+          responsibilities: [
+            "Offers preset scenarios.",
+            "Sends comparison requests against the existing session.",
+            "Shows newly gained or improved programs."
+          ],
+          io: [
+            "Input: POST /api/v1/sessions/{id}/compare",
+            "Output: comparison payloads"
+          ],
+          files: [
+            "app/static/whatif.html",
+            "app/static/whatif-page.js",
+            "app/services.py"
+          ]
+        },
+        "explorer-page": {
+          title: "Program Explorer",
+          summary: "Explorer is the product's discovery surface outside the main screener.",
+          responsibilities: [
+            "Supports keyword search and plain-English need descriptions.",
+            "Shows how the system interpreted the query.",
+            "Returns grounded program cards from the local catalog."
+          ],
+          io: [
+            "Input: POST /api/v1/explorer/search",
+            "Output: ranked grounded explorer results"
+          ],
+          files: [
+            "app/static/explorer.html",
+            "app/static/explorer-page.js",
+            "app/hybrid_explorer.py"
+          ]
+        },
+        "catalog-db": {
+          title: "Local Catalog DB",
+          summary: "The local catalog database is the center of the product. Runtime screening and Explorer both operate on this stored data.",
+          responsibilities: [
+            "Stores programs, versions, rules, questions, variants, sessions, answers, and sources.",
+            "Keeps snapshots and review tasks for change traceability.",
+            "Provides grounded local data for search and screening."
+          ],
+          io: [
+            "Input: sync pipelines, state extraction, runtime session writes",
+            "Output: grounded catalog reads for all main product surfaces"
+          ],
+          files: [
+            "app/models.py",
+            "app/db.py"
+          ]
+        },
+        "i18n-layer": {
+          title: "Shared UI + i18n",
+          summary: "The shared frontend layer handles common request logic, result rendering, session state, and the English/Spanish UI switch.",
+          responsibilities: [
+            "Loads locale dictionaries and rerenders the UI on locale change.",
+            "Stores lightweight client state like active session id and admin key.",
+            "Renders common result-card structures used across pages."
+          ],
+          io: [
+            "Input: locale JSON, API payloads, browser events",
+            "Output: translated and shared browser UI"
+          ],
+          files: [
+            "app/static/shared.js",
+            "app/static/locales/en.json",
+            "app/static/locales/es.json"
+          ]
+        },
+        "admin-tools": {
+          title: "Refresh + Review",
+          summary: "These are the operator tools for maintaining source freshness and surfacing source changes.",
+          responsibilities: [
+            "Trigger manual sync runs.",
+            "Fetch review tasks when source content changes.",
+            "Optionally enforce admin-key protection."
+          ],
+          io: [
+            "Input: GET /api/v1/admin/review-tasks and POST /api/v1/admin/sync",
+            "Output: review queue items and sync summaries"
+          ],
+          files: [
+            "app/main.py",
+            "app/static/home.js",
+            "app/static/shared.js"
+          ]
+        },
+        "federal-feed": {
+          title: "USA.gov Federal Feed",
+          summary: "This is the structured official federal source that drives the most deterministic path in the app.",
+          responsibilities: [
+            "Provides official federal program discovery.",
+            "Provides structured federal questions and eligibility criteria.",
+            "Acts as the source of truth for federal feed ingestion."
+          ],
+          io: [
+            "Input: remote federal feed fetch",
+            "Output: normalized federal catalog payload"
+          ],
+          files: [
+            "app/catalog.py"
+          ]
+        },
+        "federal-sync": {
+          title: "Federal Sync",
+          summary: "Federal sync normalizes the official federal feed into local programs, questions, rules, amounts, and sources.",
+          responsibilities: [
+            "Upserts questions and seeded question variants.",
+            "Creates or updates programs and versions.",
+            "Stores federal sources and amount rules."
+          ],
+          io: [
+            "Input: parsed federal catalog payload",
+            "Output: local federal records in the database"
+          ],
+          files: [
+            "app/services.py",
+            "app/catalog.py",
+            "app/seed_data.py"
+          ]
+        },
+        "state-directory": {
+          title: "USA.gov State Directory",
+          summary: "This is the official seed for state discovery. It gives the app authoritative state entry points to begin from.",
+          responsibilities: [
+            "Seeds one official state entry point per state.",
+            "Provides official state agency links for crawl seeding.",
+            "Anchors state discovery to official sources."
+          ],
+          io: [
+            "Input: remote state directory fetch",
+            "Output: normalized state directory payload"
+          ],
+          files: [
+            "app/catalog.py"
+          ]
+        },
+        "crawler": {
+          title: "Bounded Government Crawler",
+          summary: "The crawler explores official government pages only, using a bounded strategy rather than an unrestricted crawl.",
+          responsibilities: [
+            "Stays on approved official domains.",
+            "Uses shallow depth and capped page counts.",
+            "Returns crawled pages with title, excerpt, content hash, and source context."
+          ],
+          io: [
+            "Input: official seed URLs and category hints",
+            "Output: candidate official pages"
+          ],
+          files: [
+            "app/gov_crawl.py",
+            "app/config.py"
+          ]
+        },
+        "gemini-filter": {
+          title: "Gemini Relevance Filter",
+          summary: "Gemini is used as a filter over official pages, not as the source of truth for runtime eligibility.",
+          responsibilities: [
+            "Ranks or filters crawled pages by benefits relevance.",
+            "Reduces noisy official pages before extraction.",
+            "Falls back to heuristics if Gemini is unavailable."
+          ],
+          io: [
+            "Input: crawled official pages",
+            "Output: smaller grounded page subset"
+          ],
+          files: [
+            "app/gov_crawl.py",
+            "app/gemini.py"
+          ]
+        },
+        "gemini-extract": {
+          title: "Gemini Grounded Extraction",
+          summary: "For state coverage, Gemini can turn official crawled pages into structured state program records and question variants.",
+          responsibilities: [
+            "Creates state program summaries, rules, and question rows.",
+            "Builds grounded question variants by detail tier.",
+            "Inserts generated state records into the local catalog."
+          ],
+          io: [
+            "Input: selected official crawled pages for a state",
+            "Output: local state program, question, and variant records"
+          ],
+          files: [
+            "app/gemini.py",
+            "app/services.py"
+          ]
+        },
+        "snapshots": {
+          title: "Snapshots + Diffs",
+          summary: "Source snapshotting keeps source changes traceable over time.",
+          responsibilities: [
+            "Stores content hashes and metadata for sources.",
+            "Detects changed content between sync runs.",
+            "Creates change events for reviewable updates."
+          ],
+          io: [
+            "Input: current fetched source content",
+            "Output: source_snapshots and change_events"
+          ],
+          files: [
+            "app/services.py",
+            "app/models.py"
+          ]
+        },
+        "review-tasks": {
+          title: "Review Tasks",
+          summary: "Review tasks are the app's operational visibility layer for source changes.",
+          responsibilities: [
+            "Open a task when a source diff is considered review-worthy.",
+            "Attach URLs, diff type, and materiality score.",
+            "Feed the Home page review queue."
+          ],
+          io: [
+            "Input: change events from sync or crawl updates",
+            "Output: review_tasks records and admin queue payloads"
+          ],
+          files: [
+            "app/services.py",
+            "app/models.py"
+          ]
+        },
+        "session-create-payload": {
+          title: "Session Controls",
+          summary: "A session is created from scope, categories, state, breadth, and depth.",
+          responsibilities: [
+            "Carries the new split controls into the backend.",
+            "Preserves backward compatibility for older depth-only requests.",
+            "Defines the screening run configuration."
+          ],
+          io: [
+            "Input: SessionCreatePayload",
+            "Output: stored screening session"
+          ],
+          files: [
+            "app/schemas.py",
+            "app/main.py"
+          ]
+        },
+        "session-store": {
+          title: "Stored Session",
+          summary: "The screening session persists the runtime state needed to continue the screener.",
+          responsibilities: [
+            "Stores scope, state, categories, breadth, and depth.",
+            "Stores anonymous answer history.",
+            "Acts as the base for results, planning, and what-if comparisons."
+          ],
+          io: [
+            "Input: create_session and upsert_answers calls",
+            "Output: session reads for all runtime endpoints"
+          ],
+          files: [
+            "app/models.py",
+            "app/services.py"
+          ]
+        },
+        "candidate-filter": {
+          title: "Candidate Program Filter",
+          summary: "The candidate filter narrows the working program set before question scoring or result evaluation begins.",
+          responsibilities: [
+            "Filters by federal or state scope.",
+            "Filters state programs to the selected state.",
+            "Filters by expanded category mapping."
+          ],
+          io: [
+            "Input: session controls and local catalog",
+            "Output: candidate program list"
+          ],
+          files: [
+            "app/services.py"
+          ]
+        },
+        "breadth-policy": {
+          title: "Breadth Policy",
+          summary: "Breadth now controls how long the screener explores and how quickly more sensitive questions unlock.",
+          responsibilities: [
+            "Defines max answer count.",
+            "Defines sensitivity unlock thresholds.",
+            "Weights question scoring for broad versus narrow exploration."
+          ],
+          io: [
+            "Input: breadth_value from the session",
+            "Output: max_answers, weights, bonuses, unlock_after"
+          ],
+          files: [
+            "app/services.py"
+          ]
+        },
+        "question-scorer": {
+          title: "Question Scorer",
+          summary: "Question scoring ranks the next best unanswered fact across all remaining candidate programs.",
+          responsibilities: [
+            "Accumulates scores from matching rules and question weights.",
+            "Skips already answered questions.",
+            "Suppresses redundant state-residency questions when state is already selected."
+          ],
+          io: [
+            "Input: candidate programs, rules, answers, breadth policy",
+            "Output: scored unanswered question map"
+          ],
+          files: [
+            "app/services.py"
+          ]
+        },
+        "depth-policy": {
+          title: "Depth Variant Resolver",
+          summary: "Depth controls how exact the chosen question is, not how many total questions get asked.",
+          responsibilities: [
+            "Maps depth_value to simple, standard, or detailed question tiers.",
+            "Resolves the correct question variant at runtime.",
+            "Makes the same logical question broader or more precise."
+          ],
+          io: [
+            "Input: question key and depth_value",
+            "Output: variant prompt, input type, hint, options, and normalizer"
+          ],
+          files: [
+            "app/services.py",
+            "app/seed_data.py",
+            "app/gemini.py"
+          ]
+        },
+        "question-response": {
+          title: "Question Payload",
+          summary: "The browser receives the resolved question payload after breadth scoring and depth-specific variant selection.",
+          responsibilities: [
+            "Carries prompt, hint, input type, options, and sensitivity.",
+            "Lets the frontend render the right control type.",
+            "Keeps state_code special-cased as a live state selector."
+          ],
+          io: [
+            "Input: resolved Question + QuestionVariant",
+            "Output: serialized question JSON"
+          ],
+          files: [
+            "app/services.py",
+            "app/schemas.py"
+          ]
+        },
+        "answer-normalizer": {
+          title: "Answer Normalizer",
+          summary: "Normalizers let detailed answers satisfy simpler canonical eligibility rules without changing the rule model.",
+          responsibilities: [
+            "Converts detailed values into canonical rule forms.",
+            "Handles thresholds like income or months unable to work.",
+            "Runs at answer-write time."
+          ],
+          io: [
+            "Input: detailed answer and normalizer key",
+            "Output: normalized stored answer"
+          ],
+          files: [
+            "app/normalizers.py",
+            "app/services.py"
+          ]
+        },
+        "rule-evaluator": {
+          title: "Rule Evaluator",
+          summary: "The rule evaluator applies stored program rules to the normalized answer set and assigns status.",
+          responsibilities: [
+            "Evaluates rule matches and failures.",
+            "Builds matched reasons and missing facts.",
+            "Feeds confidence and result ranking."
+          ],
+          io: [
+            "Input: normalized answers, rules, amount rules, sources",
+            "Output: eligibility status and result payload"
+          ],
+          files: [
+            "app/rules.py",
+            "app/services.py"
+          ]
+        },
+        "plan-builder": {
+          title: "Plan Builder",
+          summary: "The plan builder is a summarization layer over the live result set.",
+          responsibilities: [
+            "Builds dashboard metrics and grouped benefit stack data.",
+            "Ranks missing facts and action links.",
+            "Builds the official source hub and document checklist."
+          ],
+          io: [
+            "Input: current results",
+            "Output: planning dashboard payload"
+          ],
+          files: [
+            "app/services.py"
+          ]
+        },
+        "explorer-input": {
+          title: "Explorer Input",
+          summary: "Explorer starts from what a user knows, either a keyword or a life situation.",
+          responsibilities: [
+            "Accepts keyword and plain-English description.",
+            "Accepts optional scope and state filters.",
+            "Does not require an active screening session."
+          ],
+          io: [
+            "Input: Explorer form payload",
+            "Output: hybrid search request"
+          ],
+          files: [
+            "app/static/explorer.html",
+            "app/static/explorer-page.js"
+          ]
+        },
+        "explorer-interpretation": {
+          title: "Heuristic or Gemini Intent Parse",
+          summary: "Explorer can interpret a need description using local heuristics or Gemini when configured.",
+          responsibilities: [
+            "Extracts likely categories, state hints, and search terms.",
+            "Explains the interpretation back to the user.",
+            "Falls back to heuristics if Gemini is unavailable."
+          ],
+          io: [
+            "Input: description and query text",
+            "Output: interpreted search constraints"
+          ],
+          files: [
+            "app/hybrid_explorer.py"
+          ]
+        },
+        "explorer-search": {
+          title: "Local Catalog Search",
+          summary: "Explorer search stays grounded in the stored catalog rather than performing a live web crawl.",
+          responsibilities: [
+            "Searches only known programs in the local database.",
+            "Applies interpreted filters and ranking.",
+            "Returns grounded match reasons and source-backed programs."
+          ],
+          io: [
+            "Input: interpreted filters and catalog",
+            "Output: ranked program list"
+          ],
+          files: [
+            "app/hybrid_explorer.py",
+            "app/services.py"
+          ]
+        },
+        "explorer-results-node": {
+          title: "Ranked Explorer Results",
+          summary: "Explorer results are grounded program cards, not free-form AI answers.",
+          responsibilities: [
+            "Show match reasons.",
+            "Show official links and source references.",
+            "Keep discovery tied to stored programs."
+          ],
+          io: [
+            "Input: ranked explorer payload",
+            "Output: rendered explorer card list"
+          ],
+          files: [
+            "app/static/explorer-page.js",
+            "app/static/shared.js"
+          ]
+        },
+        "sync-button-node": {
+          title: "Refresh Official Sources",
+          summary: "This is the manual operator trigger for a remote source refresh and crawl-backed update pass.",
+          responsibilities: [
+            "Starts a refresh on demand.",
+            "Surfaces success or failure summary back to the UI.",
+            "Uses admin-key protection if configured."
+          ],
+          io: [
+            "Input: click action on the Home page",
+            "Output: POST /api/v1/admin/sync"
+          ],
+          files: [
+            "app/static/home.js"
+          ]
+        },
+        "admin-sync-endpoint": {
+          title: "Admin Sync Endpoint",
+          summary: "The admin sync endpoint triggers the official source update pipeline and returns summary counts.",
+          responsibilities: [
+            "Checks admin auth when configured.",
+            "Calls the remote sync pipeline.",
+            "Returns refresh summary and review task data."
+          ],
+          io: [
+            "Input: POST /api/v1/admin/sync",
+            "Output: sync summary payload"
+          ],
+          files: [
+            "app/main.py"
+          ]
+        },
+        "sync-pipeline": {
+          title: "Remote Sync Pipeline",
+          summary: "The remote sync pipeline refreshes official source inputs and crawl enrichment in one pass.",
+          responsibilities: [
+            "Fetches the federal feed and state directory.",
+            "Updates local catalog data.",
+            "Runs crawl enrichment and snapshot tracking."
+          ],
+          io: [
+            "Input: official remote fetches",
+            "Output: updated local records and sync summary"
+          ],
+          files: [
+            "app/services.py",
+            "app/catalog.py",
+            "app/gov_crawl.py"
+          ]
+        },
+        "snapshot-diff-node": {
+          title: "Snapshot and Diff",
+          summary: "Snapshot and diff logic is the product's source-change memory.",
+          responsibilities: [
+            "Hashes source content.",
+            "Stores snapshot metadata.",
+            "Creates change events when content changes."
+          ],
+          io: [
+            "Input: current source content",
+            "Output: snapshots and change events"
+          ],
+          files: [
+            "app/services.py",
+            "app/models.py"
+          ]
+        },
+        "review-queue-node": {
+          title: "Review Queue",
+          summary: "The review queue exposes source changes to an operator instead of hiding them.",
+          responsibilities: [
+            "Shows open review tasks.",
+            "Surfaces diff type and materiality score.",
+            "Links back to the changed official source URL."
+          ],
+          io: [
+            "Input: GET /api/v1/admin/review-tasks",
+            "Output: Home page review queue"
+          ],
+          files: [
+            "app/main.py",
+            "app/static/home.js"
+          ]
+        }
+      };
+
+      const flowButtons = document.querySelectorAll(".flow-button");
+      const flowViews = document.querySelectorAll(".flow-view");
+      const nodes = document.querySelectorAll(".node");
+      const detailTitle = document.querySelector("#detail-title");
+      const detailSummary = document.querySelector("#detail-summary");
+      const detailResponsibilities = document.querySelector("#detail-responsibilities");
+      const detailIO = document.querySelector("#detail-io");
+      const detailFiles = document.querySelector("#detail-files");
+
+      function renderDetail(nodeKey) {
+        const detail = nodeDetails[nodeKey];
+        if (!detail) return;
+
+        detailTitle.textContent = detail.title;
+        detailSummary.textContent = detail.summary;
+        detailResponsibilities.innerHTML = detail.responsibilities.map((item) => `<li>${item}</li>`).join("");
+        detailIO.innerHTML = detail.io.map((item) => `<li>${item}</li>`).join("");
+        detailFiles.innerHTML = detail.files.map((item) => `<li><code>${item}</code></li>`).join("");
+
+        nodes.forEach((node) => node.classList.toggle("active", node.dataset.node === nodeKey));
+      }
+
+      function activateFlow(flowKey) {
+        flowButtons.forEach((button) => button.classList.toggle("active", button.dataset.flowTarget === flowKey));
+        flowViews.forEach((view) => view.classList.toggle("active", view.dataset.flow === flowKey));
+
+        const firstNode = document.querySelector(`.flow-view[data-flow="${flowKey}"] .node`);
+        if (firstNode) renderDetail(firstNode.dataset.node);
+      }
+
+      flowButtons.forEach((button) => {
+        button.addEventListener("click", () => activateFlow(button.dataset.flowTarget));
+      });
+
+      nodes.forEach((node) => {
+        node.addEventListener("click", () => renderDetail(node.dataset.node));
+      });
+
+      activateFlow("overview");
+    </script>
+  </body>
+</html>
