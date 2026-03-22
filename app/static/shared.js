@@ -100,10 +100,16 @@ const categoryDefinitions = [
   { value: "welfare_cash_assistance", labelKey: "category.welfare_cash_assistance" },
 ];
 
+const breadthDescriptions = [
+  { at: 0.0, labelKey: "home.breadthFocused", textKey: "breadth.focused" },
+  { at: 0.5, labelKey: "home.breadthBalanced", textKey: "breadth.balanced" },
+  { at: 1.0, labelKey: "home.breadthBroad", textKey: "breadth.broad" },
+];
+
 const depthDescriptions = [
-  { at: 0.0, labelKey: "home.depthQuick", textKey: "depth.quick" },
+  { at: 0.0, labelKey: "home.depthLight", textKey: "depth.light" },
   { at: 0.5, labelKey: "home.depthStandard", textKey: "depth.standard" },
-  { at: 1.0, labelKey: "home.depthDeep", textKey: "depth.deep" },
+  { at: 1.0, labelKey: "home.depthDetailed", textKey: "depth.detailed" },
 ];
 
 const scenarioPresets = [
@@ -138,6 +144,18 @@ function getCategoryLabel(value) {
   return t(`category.${value}`);
 }
 
+function getBreadthDescriptor(value) {
+  const val = Number.isFinite(value) ? value : 0.5;
+  let best = breadthDescriptions[0];
+  for (const descriptor of breadthDescriptions) {
+    if (Math.abs(descriptor.at - val) < Math.abs(best.at - val)) best = descriptor;
+  }
+  return {
+    label: t(best.labelKey),
+    text: t(best.textKey),
+  };
+}
+
 function getDepthDescriptor(value) {
   const val = Number.isFinite(value) ? value : 0.5;
   let best = depthDescriptions[0];
@@ -148,6 +166,27 @@ function getDepthDescriptor(value) {
     label: t(best.labelKey),
     text: t(best.textKey),
   };
+}
+
+function estimateBreadthQuestionCount(value) {
+  const anchors = [
+    { at: 0.0, count: 4 },
+    { at: 0.5, count: 10 },
+    { at: 1.0, count: 24 },
+  ];
+  const val = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0.5));
+  let lower = anchors[0];
+  let upper = anchors[anchors.length - 1];
+  for (const anchor of anchors) {
+    if (anchor.at <= val) lower = anchor;
+    if (anchor.at >= val) {
+      upper = anchor;
+      break;
+    }
+  }
+  if (lower.at === upper.at) return lower.count;
+  const ratio = (val - lower.at) / (upper.at - lower.at);
+  return Math.round(lower.count + (upper.count - lower.count) * ratio);
 }
 
 function getScenarioPresetDisplay(preset) {

@@ -49,17 +49,31 @@
           </label>
 
           <label>
-            <span data-i18n="home.depth">Depth</span>
-            <input type="range" id="depth-slider" name="depth_value"
+            <span data-i18n="home.breadth">Breadth</span>
+            <input type="range" id="breadth-slider" class="control-slider" name="breadth_value"
                    min="0" max="1" step="0.01" value="0.5" />
             <div class="depth-labels">
-              <span data-i18n="home.depthQuick">Quick</span>
+              <span data-i18n="home.breadthFocused">Focused</span>
+              <span data-i18n="home.breadthBalanced">Balanced</span>
+              <span data-i18n="home.breadthBroad">Broad</span>
+            </div>
+          </label>
+          <p id="breadth-description" class="meta">
+            Balanced explores a moderate number of possible programs before stopping. (~10 questions)
+          </p>
+
+          <label>
+            <span data-i18n="home.depth">Depth</span>
+            <input type="range" id="depth-slider" class="control-slider" name="depth_value"
+                   min="0" max="1" step="0.01" value="0.5" />
+            <div class="depth-labels">
+              <span data-i18n="home.depthLight">High-level</span>
               <span data-i18n="home.depthStandard">Standard</span>
-              <span data-i18n="home.depthDeep">Deep</span>
+              <span data-i18n="home.depthDetailed">Detailed</span>
             </div>
           </label>
           <p id="depth-description" class="meta">
-            Standard asks a balanced number of questions and starts pulling in more detailed follow-ups after the basics.
+            Standard mixes broad screeners with some more specific follow-ups.
           </p>
 
           <fieldset class="category-picker">

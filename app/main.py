@@ -46,6 +46,19 @@ def _migrate_depth_value(db_engine):
                 conn.execute(text("ALTER TABLE screening_sessions ADD COLUMN depth_value REAL DEFAULT 0.5"))
 
 
+def _migrate_breadth_value(db_engine):
+    """Add breadth_value column to screening_sessions if missing (SQLite)."""
+    from sqlalchemy import inspect as sa_inspect, text
+    inspector = sa_inspect(db_engine)
+    if "screening_sessions" in inspector.get_table_names():
+        cols = {c["name"] for c in inspector.get_columns("screening_sessions")}
+        if "breadth_value" not in cols:
+            with db_engine.begin() as conn:
+                conn.execute(text("ALTER TABLE screening_sessions ADD COLUMN breadth_value REAL DEFAULT 0.5"))
+                if "depth_value" in cols:
+                    conn.execute(text("UPDATE screening_sessions SET breadth_value = COALESCE(depth_value, 0.5)"))
+
+
 def _migrate_documents_json(db_engine):
     """Add documents_json column to programs if missing (SQLite)."""
     from sqlalchemy import inspect as sa_inspect, text
@@ -80,6 +93,7 @@ def _migrate_amount_rule_formulas(db_engine):
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     _migrate_depth_value(engine)
+    _migrate_breadth_value(engine)
     _migrate_documents_json(engine)
     _migrate_amount_rule_formulas(engine)
     db = SessionLocal()
@@ -188,6 +202,7 @@ def create_screening_session(payload: SessionCreatePayload, db: Session = Depend
         state_code=payload.state_code,
         categories=payload.categories,
         depth_mode=payload.depth_mode or "standard",
+        breadth_value=payload.breadth_value,
         depth_value=payload.depth_value,
     )
     answers = get_answers_map(db, session)

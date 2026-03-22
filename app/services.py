@@ -42,7 +42,7 @@ from app.rules import evaluate_matches_any, score_status
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-DEPTH_ANCHORS: list[tuple[float, dict[str, Any]]] = [
+BREADTH_ANCHORS: list[tuple[float, dict[str, Any]]] = [
     (0.0, {
         "max_answers": 4,
         "weights": {"low": 1.0, "medium": 0.25, "high": 0.05},
@@ -63,7 +63,7 @@ DEPTH_ANCHORS: list[tuple[float, dict[str, Any]]] = [
     }),
 ]
 
-DEPTH_MODE_TO_VALUE = {"quick": 0.0, "standard": 0.5, "deep": 1.0}
+LEGACY_CONTROL_MODE_TO_VALUE = {"quick": 0.0, "standard": 0.5, "deep": 1.0}
 STATE_RESIDENCY_TERMS = (
     "resident",
     "residency",
@@ -103,24 +103,24 @@ def _lerp_dict(a: dict[str, float], b: dict[str, float], t: float, *, round_int:
     return result
 
 
-def interpolate_depth_policy(depth_value: float) -> dict[str, Any]:
-    depth_value = max(0.0, min(1.0, depth_value))
-    lo_val, lo_pol = DEPTH_ANCHORS[0]
-    for anchor_val, anchor_pol in DEPTH_ANCHORS:
-        if anchor_val <= depth_value:
+def interpolate_breadth_policy(breadth_value: float) -> dict[str, Any]:
+    breadth_value = max(0.0, min(1.0, breadth_value))
+    lo_val, lo_pol = BREADTH_ANCHORS[0]
+    for anchor_val, anchor_pol in BREADTH_ANCHORS:
+        if anchor_val <= breadth_value:
             lo_val, lo_pol = anchor_val, anchor_pol
         else:
             break
-    hi_val, hi_pol = DEPTH_ANCHORS[-1]
-    for anchor_val, anchor_pol in reversed(DEPTH_ANCHORS):
-        if anchor_val >= depth_value:
+    hi_val, hi_pol = BREADTH_ANCHORS[-1]
+    for anchor_val, anchor_pol in reversed(BREADTH_ANCHORS):
+        if anchor_val >= breadth_value:
             hi_val, hi_pol = anchor_val, anchor_pol
         else:
             break
     if lo_val == hi_val:
         t = 0.0
     else:
-        t = (depth_value - lo_val) / (hi_val - lo_val)
+        t = (breadth_value - lo_val) / (hi_val - lo_val)
     return {
         "max_answers": round(_lerp(lo_pol["max_answers"], hi_pol["max_answers"], t)),
         "weights": _lerp_dict(lo_pol["weights"], hi_pol["weights"], t),
@@ -661,15 +661,20 @@ def create_session(
     state_code: Optional[str],
     categories: list[str],
     depth_mode: str = "standard",
+    breadth_value: Optional[float] = None,
     depth_value: Optional[float] = None,
 ) -> ScreeningSession:
+    legacy_value = LEGACY_CONTROL_MODE_TO_VALUE.get(depth_mode, 0.5)
+    if breadth_value is None:
+        breadth_value = depth_value if depth_value is not None else legacy_value
     if depth_value is None:
-        depth_value = DEPTH_MODE_TO_VALUE.get(depth_mode, 0.5)
+        depth_value = legacy_value
     session = ScreeningSession(
         scope=scope,
         state_code=state_code.upper() if state_code else None,
         categories_json=sorted({item for item in categories if item}),
         depth_mode=depth_mode,
+        breadth_value=breadth_value,
         depth_value=depth_value,
     )
     db.add(session)
@@ -691,14 +696,8 @@ def get_session_or_404(db: Session, public_id: str) -> ScreeningSession:
 
 
 def upsert_answers(db: Session, session: ScreeningSession, answers: dict[str, Any]) -> None:
-    tier = depth_value_to_tier(session.depth_value)
     for key, value in answers.items():
-        variant = db.scalar(
-            select(QuestionVariant).where(
-                QuestionVariant.question_key == key,
-                QuestionVariant.depth_tier == tier,
-            )
-        )
+        variant = resolve_question_variant(db, key, session.depth_value)
         if variant and variant.normalizer:
             value = normalize_answer(value, key, variant.normalizer)
         answer = db.scalar(
@@ -726,7 +725,7 @@ def get_answers_map(db: Session, session: ScreeningSession) -> dict[str, Any]:
 
 
 def get_next_question(db: Session, session: ScreeningSession, answers: dict[str, Any]) -> Optional[Question]:
-    policy = get_depth_policy(session)
+    policy = get_breadth_policy(session)
     if session.scope in {"state", "both"} and not session.state_code and "state_code" not in answers:
         return db.scalar(select(Question).where(Question.key == "state_code"))
 
@@ -1249,11 +1248,27 @@ def status_rank(status: str) -> int:
     return ranking.get(status, 0)
 
 
-def get_depth_policy(session: ScreeningSession) -> dict[str, Any]:
-    value = getattr(session, "depth_value", None)
+def get_breadth_policy(session: ScreeningSession) -> dict[str, Any]:
+    value = getattr(session, "breadth_value", None)
     if value is None:
-        value = DEPTH_MODE_TO_VALUE.get(session.depth_mode, 0.5)
-    return interpolate_depth_policy(value)
+        value = getattr(session, "depth_value", None)
+    if value is None:
+        value = LEGACY_CONTROL_MODE_TO_VALUE.get(session.depth_mode, 0.5)
+    return interpolate_breadth_policy(value)
+
+
+def resolve_question_variant(
+    db: Session,
+    question_key: str,
+    depth_value: float,
+) -> Optional[QuestionVariant]:
+    tier = depth_value_to_tier(depth_value)
+    return db.scalar(
+        select(QuestionVariant).where(
+            QuestionVariant.question_key == question_key,
+            QuestionVariant.depth_tier == tier,
+        )
+    )
 
 
 def question_is_unlocked(question: Question, answers_count: int, policy: dict[str, Any]) -> bool:
@@ -1268,7 +1283,7 @@ def score_unanswered_questions(
     *,
     enforce_depth_unlocks: bool,
 ) -> dict[str, float]:
-    policy = get_depth_policy(session)
+    policy = get_breadth_policy(session)
     scores: dict[str, float] = {}
     candidate_programs = get_candidate_programs(db, session)
     answers_count = len(answers)
@@ -1490,6 +1505,7 @@ def build_profile_summary(session: ScreeningSession, answers: dict[str, Any]) ->
         "scope": session.scope,
         "state_code": session.state_code,
         "depth_mode": session.depth_mode,
+        "breadth_value": getattr(session, "breadth_value", session.depth_value),
         "depth_value": session.depth_value,
         "selected_categories": [
             {"key": category, "label": CATEGORY_LABELS.get(category, category.replace("_", " ").title())}
@@ -1867,13 +1883,7 @@ def serialize_question(
     input_type = question.input_type
     options = question.options_json
 
-    tier = depth_value_to_tier(depth_value)
-    variant = db.scalar(
-        select(QuestionVariant).where(
-            QuestionVariant.question_key == question.key,
-            QuestionVariant.depth_tier == tier,
-        )
-    )
+    variant = resolve_question_variant(db, question.key, depth_value)
     if variant is not None:
         prompt = variant.prompt
         hint = variant.hint

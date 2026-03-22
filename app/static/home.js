@@ -2,6 +2,8 @@ const scopeSelect = document.querySelector("#scope");
 const stateSelect = document.querySelector("#state-code");
 const stateValidation = document.querySelector("#state-validation");
 const startScreeningPanel = document.querySelector("#start-screening-panel");
+const breadthSlider = document.querySelector("#breadth-slider");
+const breadthDescription = document.querySelector("#breadth-description");
 const depthSlider = document.querySelector("#depth-slider");
 const depthDescription = document.querySelector("#depth-description");
 const startForm = document.querySelector("#start-form");
@@ -54,11 +56,17 @@ function updateStateVisibility() {
   if (scope === "federal") setStateValidation("");
 }
 
+function updateBreadthDescription() {
+  const val = parseFloat(breadthSlider.value);
+  const best = getBreadthDescriptor(val);
+  const maxQ = estimateBreadthQuestionCount(val);
+  breadthDescription.textContent = t("home.breadthApprox", { description: best.text, count: maxQ });
+}
+
 function updateDepthDescription() {
   const val = parseFloat(depthSlider.value);
   const best = getDepthDescriptor(val);
-  const maxQ = Math.round(4 + val * 20);
-  depthDescription.textContent = t("home.questionsApprox", { description: best.text, count: maxQ });
+  depthDescription.textContent = t("home.depthApprox", { description: best.text });
 }
 
 function renderCategories() {
@@ -197,9 +205,11 @@ function resetApp() {
 
   scopeSelect.value = "both";
   stateSelect.value = "";
+  breadthSlider.value = 0.5;
   depthSlider.value = 0.5;
   setAllCategories(false);
   updateStateVisibility();
+  updateBreadthDescription();
   updateDepthDescription();
 
   questionForm.classList.add("hidden");
@@ -247,6 +257,7 @@ startForm.addEventListener("submit", async (event) => {
       scope: scopeSelect.value,
       state_code: stateSelect.value || null,
       categories,
+      breadth_value: parseFloat(breadthSlider.value),
       depth_value: parseFloat(depthSlider.value),
     };
     setActiveScope(payload.scope);
@@ -326,6 +337,7 @@ scopeSelect.addEventListener("change", updateStateVisibility);
 stateSelect.addEventListener("change", () => {
   if (stateSelect.value) setStateValidation("");
 });
+breadthSlider.addEventListener("input", updateBreadthDescription);
 depthSlider.addEventListener("input", updateDepthDescription);
 saveAdminKeyButton?.addEventListener("click", saveAdminKeyFromInput);
 clearAdminKeyButton?.addEventListener("click", () => {
@@ -344,6 +356,7 @@ document.querySelector("#reset-button").addEventListener("click", resetApp);
 
 document.addEventListener("localechange", () => {
   renderCategories();
+  updateBreadthDescription();
   updateDepthDescription();
   loadStates().catch((error) => setStatus(error.message));
   if (state.currentQuestion) {
@@ -366,4 +379,5 @@ loadStates()
   .then(() => loadReviewTasks())
   .catch((error) => setStatus(error.message));
 updateStateVisibility();
+updateBreadthDescription();
 updateDepthDescription();

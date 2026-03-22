@@ -221,6 +221,7 @@ class ScreeningSession(Base):
     state_code: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     categories_json: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
     depth_mode: Mapped[str] = mapped_column(String(16), default="standard")
+    breadth_value: Mapped[float] = mapped_column(Float, default=0.5)
     depth_value: Mapped[float] = mapped_column(Float, default=0.5)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
