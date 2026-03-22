@@ -22,6 +22,7 @@ from app.models import Agency, AmountRule, EligibilityRule, Program, ProgramVers
 from app.catalog import build_fallback_federal_catalog, build_fallback_state_directory
 from app import services as services_module
 from app import gemini as gemini_module
+from app import intake_copilot as intake_module
 
 
 def seed_state_program_with_redundant_residency_rule() -> None:
@@ -690,6 +691,58 @@ def test_life_event_intake_interprets_story_into_categories_and_facts() -> None:
         assert "recent_job_loss" in fact_keys
         assert "housing_urgency" in fact_keys
         assert payload["next_probe"] is not None
+        assert payload["assistant_method"] == "deterministic"
+        assert any(action["key"] == "use_screener" for action in payload["navigation_actions"])
+        assert not payload["chat_reply"].startswith("This sounds most connected to")
+        assert "we should look at" in payload["chat_reply"].lower() or "i’m sorry" in payload["chat_reply"].lower() or "i'm sorry" in payload["chat_reply"].lower()
+
+
+def test_life_event_intake_handles_greeting_conversationally() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/intake/interpret",
+            json={
+                "description": "hi",
+                "use_llm": False,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+
+        assert payload["next_probe"] is None
+        assert payload["suggested_categories"] == []
+        assert "general support" not in payload["chat_reply"].lower()
+        assert "zobo" in payload["chat_reply"].lower()
+        assert "tell me" in payload["chat_reply"].lower() or "can help" in payload["chat_reply"].lower()
+
+
+def test_life_event_intake_can_use_gemini_guidance_without_live_api() -> None:
+    original = intake_module.generate_intake_assistant_guidance
+    intake_module.generate_intake_assistant_guidance = lambda **_: {
+        "summary": "This sounds like food and housing instability in California.",
+        "chat_reply": "I narrowed this to food and housing help in California. The next best step is to tell me whether your income is limited.",
+        "next_probe_key": "applicant_income",
+        "navigation_actions": ["open_explorer", "start_screening"],
+    }
+    try:
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/intake/interpret",
+                json={
+                    "description": "I am in California and need food help because my rent and bills are hard to cover.",
+                    "use_llm": True,
+                },
+            )
+            assert response.status_code == 200
+            payload = response.json()
+
+            assert payload["assistant_method"] == "gemini+grounded"
+            assert payload["summary"] == "This sounds like food and housing instability in California."
+            assert payload["chat_reply"].startswith("I narrowed this to food and housing help")
+            assert payload["next_probe"]["key"] == "applicant_income"
+            assert [action["key"] for action in payload["navigation_actions"]] == ["open_explorer", "start_screening"]
+    finally:
+        intake_module.generate_intake_assistant_guidance = original
 
 
 def test_life_event_probe_updates_state_and_prefill_answers() -> None:
@@ -732,6 +785,43 @@ def test_life_event_probe_updates_state_and_prefill_answers() -> None:
         assert probe_payload["suggested_scope"] == "both"
         assert "state_code" in fact_keys
         assert probe_payload["current_facts"]["state_code"] == "NY"
+
+
+def test_life_event_probe_can_reach_conclusion_after_key_follow_up() -> None:
+    with TestClient(app) as client:
+        initial = client.post(
+            "/api/v1/intake/interpret",
+            json={
+                "description": "I lost my job and I am behind on rent and groceries.",
+                "use_llm": False,
+            },
+        )
+        assert initial.status_code == 200
+        first_payload = initial.json()
+        assert first_payload["next_probe"] is not None
+
+        probe = client.post(
+            "/api/v1/intake/probe",
+            json={
+                "description": "I lost my job and I am behind on rent and groceries.",
+                "scope": first_payload["suggested_scope"],
+                "state_code": first_payload["applied_state_code"],
+                "categories": [item["key"] for item in first_payload["suggested_categories"]],
+                "current_facts": first_payload["current_facts"],
+                "pending_question_key": first_payload["next_probe"]["key"],
+                "messages": [
+                    {"role": "assistant", "content": first_payload["chat_reply"]},
+                    {"role": "user", "content": "I am in California."},
+                ],
+                "use_llm": False,
+            },
+        )
+        assert probe.status_code == 200
+        payload = probe.json()
+
+        assert payload["applied_state_code"] == "CA"
+        assert payload["next_probe"] is None
+        assert "enough" in payload["chat_reply"].lower() or "move forward" in payload["chat_reply"].lower()
 
 
 def test_selected_state_suppresses_redundant_residency_questions_across_depths() -> None:

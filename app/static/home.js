@@ -14,23 +14,10 @@ const adminKeyInput = document.querySelector("#admin-key");
 const saveAdminKeyButton = document.querySelector("#save-admin-key");
 const clearAdminKeyButton = document.querySelector("#clear-admin-key");
 
-const lifeIntakeDescription = document.querySelector("#life-intake-description");
-const lifeIntakeAnalyzeButton = document.querySelector("#life-intake-analyze");
-const lifeIntakeClearButton = document.querySelector("#life-intake-clear");
-const lifeIntakeStatus = document.querySelector("#life-intake-status");
-const lifeIntakeOutput = document.querySelector("#life-intake-output");
-const lifeIntakeSummary = document.querySelector("#life-intake-summary");
-const lifeIntakeScope = document.querySelector("#life-intake-scope");
-const lifeIntakeState = document.querySelector("#life-intake-state");
-const lifeIntakeCategories = document.querySelector("#life-intake-categories");
-const lifeIntakeFacts = document.querySelector("#life-intake-facts");
-const lifeIntakeMissing = document.querySelector("#life-intake-missing");
-const lifeIntakeApplyButton = document.querySelector("#life-intake-apply");
-const lifeIntakeStartButton = document.querySelector("#life-intake-start");
 const lifeChatLauncher = document.querySelector("#life-chat-launcher");
 const lifeChatPopover = document.querySelector("#life-chat-popover");
+const lifeChatHeader = document.querySelector(".life-chat-header");
 const lifeChatCloseButton = document.querySelector("#life-chat-close");
-const lifeChatEmpty = document.querySelector("#life-chat-empty");
 const lifeChatbox = document.querySelector("#life-chatbox");
 const lifeChatMessages = document.querySelector("#life-chat-messages");
 const lifeChatSuggestions = document.querySelector("#life-chat-suggestions");
@@ -72,8 +59,7 @@ function setStateValidation(message = "") {
 }
 
 function setLifeIntakeStatus(message = "") {
-  if (!lifeIntakeStatus) return;
-  lifeIntakeStatus.textContent = message;
+  setStatus(message);
 }
 
 async function loadStates() {
@@ -231,9 +217,22 @@ function getLifeAssistantName() {
   return t("home.lifeAssistantName");
 }
 
+function getNavigationActionLabel(action) {
+  const translated = t(`home.navAction.${action.key}`);
+  return translated !== `home.navAction.${action.key}` ? translated : action.label;
+}
+
+function getLifeChatWelcomeMessage() {
+  return t("home.lifeChatWelcome");
+}
+
 function getLifeChatStatusText() {
   if (!intakeState.payload) return t("home.lifeChatStatusEmpty");
   if (intakeState.isProbeLoading) return t("home.lifeChatStatusThinking");
+  const noMeaningfulSummary = !intakeState.payload.summary;
+  const noCategories = !(intakeState.payload.suggested_categories || []).length;
+  const noFacts = !(intakeState.payload.structured_facts || []).length;
+  if (noMeaningfulSummary && noCategories && noFacts) return t("home.lifeChatStatusWaitingDetails");
   if (intakeState.payload?.next_probe) return t("home.lifeChatStatusReady");
   return t("home.lifeChatStatusDone");
 }
@@ -269,6 +268,24 @@ function buildLifeChatSuggestions() {
   return [];
 }
 
+function syncLifePayloadToForm({ announce = false, scroll = false } = {}) {
+  if (!intakeState.payload) return;
+  scopeSelect.value = intakeState.payload.suggested_scope || "federal";
+  if (intakeState.payload.applied_state_code) {
+    stateSelect.value = intakeState.payload.applied_state_code;
+  }
+  const categoryKeys = (intakeState.payload.suggested_categories || []).map((category) => category.key);
+  setSelectedCategories(categoryKeys);
+  updateStateVisibility();
+  setStateValidation("");
+  if (announce) {
+    setStatus(t("home.lifeApplyDone"));
+  }
+  if (scroll) {
+    scrollToTopOf(startScreeningPanel);
+  }
+}
+
 function resetLifeChat() {
   intakeState.messages = [];
   intakeState.pendingQuestionKey = null;
@@ -278,7 +295,7 @@ function resetLifeChat() {
 }
 
 function setLifeChatOpen(open, { focusInput = false } = {}) {
-  intakeState.chatOpen = Boolean(open) && Boolean(intakeState.payload);
+  intakeState.chatOpen = Boolean(open);
   if (lifeChatPopover) lifeChatPopover.classList.toggle("hidden", !intakeState.chatOpen);
   if (lifeChatLauncher) {
     lifeChatLauncher.setAttribute("aria-expanded", intakeState.chatOpen ? "true" : "false");
@@ -293,38 +310,19 @@ function closeLifeChat() {
 }
 
 function renderLifeChat() {
-  if (!lifeChatbox || !lifeChatEmpty || !lifeChatMessages || !lifeChatLauncher) return;
+  if (!lifeChatbox || !lifeChatMessages || !lifeChatLauncher) return;
   const hasPayload = Boolean(intakeState.payload);
-  lifeChatLauncher.classList.toggle("hidden", !hasPayload);
   lifeChatLauncher.classList.toggle("has-probe", Boolean(intakeState.payload?.next_probe));
-  lifeChatEmpty.classList.toggle("hidden", hasPayload);
-  lifeChatbox.classList.toggle("hidden", !hasPayload);
+  lifeChatbox.classList.remove("hidden");
   if (lifeChatAssistantStatus) {
     lifeChatAssistantStatus.textContent = getLifeChatStatusText();
-  }
-  if (!hasPayload) {
-    setLifeChatOpen(false);
-    if (lifeChatSuggestions) {
-      lifeChatSuggestions.classList.add("hidden");
-      lifeChatSuggestions.innerHTML = "";
-    }
-    if (lifeChatInput) {
-      lifeChatInput.value = "";
-      lifeChatInput.placeholder = t("home.lifeChatPlaceholder");
-      lifeChatInput.disabled = true;
-    }
-    if (lifeChatSendButton) {
-      setBusyButtonText(lifeChatSendButton, false, t("home.lifeChatSending"), t("home.lifeChatSend"));
-      lifeChatSendButton.disabled = true;
-    }
-    return;
   }
 
   lifeChatMessages.innerHTML = intakeState.messages
     .map((message) => {
       const roleClass = message.role === "assistant" ? "assistant" : "user";
       const author = message.role === "assistant" ? getLifeAssistantName() : t("home.lifeChatUserLabel");
-      const avatarText = message.role === "assistant" ? "BG" : ((author || "Y").trim().charAt(0).toUpperCase() || "Y");
+      const avatarText = message.role === "assistant" ? "ZO" : ((author || "Y").trim().charAt(0).toUpperCase() || "Y");
       return `
         <article class="chat-entry ${roleClass}">
           <div class="chat-entry-meta">
@@ -337,11 +335,23 @@ function renderLifeChat() {
     })
     .join("");
 
+  if (!intakeState.messages.length && !intakeState.isProbeLoading) {
+    lifeChatMessages.innerHTML = `
+      <article class="chat-entry assistant welcome">
+        <div class="chat-entry-meta">
+          <span class="chat-avatar assistant" aria-hidden="true">ZO</span>
+          <span class="chat-author">${escapeHtml(getLifeAssistantName())}</span>
+        </div>
+        <div class="chat-bubble assistant">${escapeHtml(getLifeChatWelcomeMessage())}</div>
+      </article>
+    `;
+  }
+
   if (intakeState.isProbeLoading) {
     lifeChatMessages.innerHTML += `
       <article class="chat-entry assistant">
         <div class="chat-entry-meta">
-          <span class="chat-avatar assistant" aria-hidden="true">BG</span>
+          <span class="chat-avatar assistant" aria-hidden="true">ZO</span>
           <span class="chat-author">${escapeHtml(getLifeAssistantName())}</span>
         </div>
         <div class="chat-bubble assistant typing" aria-label="${escapeHtml(t("home.lifeChatStatusThinking"))}">
@@ -386,7 +396,7 @@ function renderLifeChat() {
   }
 
   const probeKey = intakeState.payload?.next_probe?.key || null;
-  if (probeKey && intakeState.autoOpenedProbeKey !== probeKey) {
+  if (hasPayload && probeKey && intakeState.autoOpenedProbeKey !== probeKey) {
     intakeState.autoOpenedProbeKey = probeKey;
     setLifeChatOpen(true, { focusInput: true });
   }
@@ -394,41 +404,10 @@ function renderLifeChat() {
 
 function renderLifeIntake(payload) {
   intakeState.payload = payload;
-  intakeState.pendingQuestionKey = payload.next_probe?.key || null;
-  lifeIntakeOutput.classList.toggle("hidden", !payload);
-  if (!payload) {
-    lifeIntakeSummary.textContent = "";
-    lifeIntakeScope.textContent = "";
-    lifeIntakeState.textContent = "";
-    lifeIntakeCategories.innerHTML = "";
-    lifeIntakeFacts.innerHTML = "";
-    lifeIntakeMissing.innerHTML = "";
-    renderLifeChat();
-    return;
+  intakeState.pendingQuestionKey = payload?.next_probe?.key || null;
+  if (payload) {
+    syncLifePayloadToForm();
   }
-
-  lifeIntakeSummary.textContent = payload.summary || "";
-  lifeIntakeScope.textContent = scopeLabel(payload.suggested_scope || "federal");
-  lifeIntakeState.textContent = payload.applied_state_code || t("home.chooseState");
-
-  lifeIntakeCategories.innerHTML = (payload.suggested_categories || []).length
-    ? payload.suggested_categories
-        .map((category) => `<span class="chip">${escapeHtml(getCategoryLabel(category.key) || category.label)}</span>`)
-        .join("")
-    : `<span class="meta">${escapeHtml(t("home.lifeNoCategories"))}</span>`;
-
-  lifeIntakeFacts.innerHTML = (payload.structured_facts || []).length
-    ? payload.structured_facts
-        .map((fact) => `<span class="chip"><strong>${escapeHtml(factLabel(fact))}:</strong> ${escapeHtml(fact.value_label)}</span>`)
-        .join("")
-    : `<span class="meta">${escapeHtml(t("home.lifeNoFacts"))}</span>`;
-
-  lifeIntakeMissing.innerHTML = (payload.follow_up_questions || []).length
-    ? payload.follow_up_questions
-        .map((question) => `<li><strong>${escapeHtml(question.prompt)}</strong> <span class="meta">${escapeHtml(question.reason)}</span></li>`)
-        .join("")
-    : `<li>${escapeHtml(t("home.lifeNoMissing"))}</li>`;
-
   renderLifeChat();
 }
 
@@ -436,26 +415,16 @@ function clearLifeIntake() {
   intakeState.description = "";
   intakeState.payload = null;
   intakeState.pendingQuestionKey = null;
-  intakeState.chatOpen = false;
-  lifeIntakeDescription.value = "";
-  lifeChatInput.value = "";
-  setLifeIntakeStatus("");
+  closeLifeChat();
   resetLifeChat();
+  if (lifeChatInput) lifeChatInput.value = "";
+  setLifeIntakeStatus("");
   renderLifeIntake(null);
 }
 
 function applyIntakeSuggestionsToForm() {
   if (!intakeState.payload) return;
-  scopeSelect.value = intakeState.payload.suggested_scope || "federal";
-  if (intakeState.payload.applied_state_code) {
-    stateSelect.value = intakeState.payload.applied_state_code;
-  }
-  const categoryKeys = (intakeState.payload.suggested_categories || []).map((category) => category.key);
-  setSelectedCategories(categoryKeys);
-  updateStateVisibility();
-  setStateValidation("");
-  setStatus(t("home.lifeApplyDone"));
-  scrollToTopOf(startScreeningPanel);
+  syncLifePayloadToForm({ announce: true, scroll: true });
 }
 
 function buildSessionPayload({ scope, stateCode, categories }) {
@@ -512,9 +481,6 @@ async function startScreeningFlow(payload, prefillAnswers = {}) {
 
     renderQuestion(envelope.next_question);
     setStatus(t("home.sessionLive", { sessionId: state.sessionId }));
-    if (intakeState.payload) {
-      setLifeIntakeStatus(t("home.lifeStarted"));
-    }
   } catch (error) {
     setStatus(t("home.sessionError", { error: error.message }));
   } finally {
@@ -525,40 +491,54 @@ async function startScreeningFlow(payload, prefillAnswers = {}) {
   }
 }
 
-async function analyzeLifeIntake() {
-  const description = (lifeIntakeDescription.value || "").trim();
-  if (!description) {
+async function interpretLifeChat(description) {
+  const trimmed = (description || "").trim();
+  if (!trimmed) {
     setLifeIntakeStatus(t("home.lifeDescriptionRequired"));
     return;
   }
 
   try {
-    intakeState.description = description;
+    intakeState.description = trimmed;
     resetLifeChat();
-    setLoading(lifeIntakeAnalyzeButton, true);
+    intakeState.messages = [{ role: "user", content: trimmed }];
+    intakeState.isProbeLoading = true;
+    setLifeChatOpen(true);
+    renderLifeChat();
     setLifeIntakeStatus(t("home.lifeAnalyzing"));
     const payload = await getJson("/api/v1/intake/interpret", {
       method: "POST",
       body: JSON.stringify({
-        description,
+        description: trimmed,
         scope: scopeSelect.value || null,
         state_code: stateSelect.value || null,
         categories: selectedCategories(),
         use_llm: true,
       }),
     });
-    intakeState.messages = payload.chat_reply ? [{ role: "assistant", content: payload.chat_reply }] : [];
+    if (payload.chat_reply) {
+      intakeState.messages.push({ role: "assistant", content: payload.chat_reply });
+    }
+    intakeState.isProbeLoading = false;
     renderLifeIntake(payload);
     setLifeIntakeStatus(t("home.lifeAnalyzed"));
   } catch (error) {
+    intakeState.isProbeLoading = false;
+    renderLifeChat();
     setLifeIntakeStatus(t("home.lifeInterpretError", { error: error.message }));
   } finally {
-    setLoading(lifeIntakeAnalyzeButton, false);
+    if (lifeChatInput) lifeChatInput.value = "";
   }
 }
 
 async function sendLifeProbe(message) {
-  if (!intakeState.payload) return;
+  if (!intakeState.payload) {
+    const trimmed = (message || "").trim();
+    if (!trimmed) return;
+    await interpretLifeChat(trimmed);
+    return;
+  }
+
   const trimmed = message.trim();
   if (!trimmed) return;
 
@@ -590,7 +570,7 @@ async function sendLifeProbe(message) {
     renderLifeChat();
     setLifeIntakeStatus(t("home.lifeProbeError", { error: error.message }));
   } finally {
-    lifeChatInput.value = "";
+    if (lifeChatInput) lifeChatInput.value = "";
     if (intakeState.chatOpen && lifeChatInput) {
       requestAnimationFrame(() => lifeChatInput.focus());
     }
@@ -616,6 +596,7 @@ function resetApp() {
   questionEmpty.textContent = t("home.questionEmpty");
   questionEmpty.classList.remove("hidden");
 
+  clearLifeIntake();
   setStatus("");
 }
 
@@ -660,22 +641,6 @@ questionForm.addEventListener("submit", async (event) => {
   }
 });
 
-lifeIntakeAnalyzeButton?.addEventListener("click", analyzeLifeIntake);
-lifeIntakeClearButton?.addEventListener("click", clearLifeIntake);
-lifeIntakeApplyButton?.addEventListener("click", applyIntakeSuggestionsToForm);
-lifeIntakeStartButton?.addEventListener("click", async () => {
-  if (!intakeState.payload) return;
-  applyIntakeSuggestionsToForm();
-  await startScreeningFlow(
-    buildSessionPayload({
-      scope: intakeState.payload.suggested_scope,
-      stateCode: intakeState.payload.applied_state_code,
-      categories: (intakeState.payload.suggested_categories || []).map((category) => category.key),
-    }),
-    intakeState.payload.prefill_answers || {},
-  );
-});
-
 lifeChatForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (intakeState.isProbeLoading) return;
@@ -695,6 +660,13 @@ lifeChatLauncher?.addEventListener("click", () => {
 lifeChatCloseButton?.addEventListener("click", (event) => {
   event.preventDefault();
   event.stopPropagation();
+  closeLifeChat();
+});
+
+lifeChatHeader?.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest("#life-chat-close")) return;
   closeLifeChat();
 });
 

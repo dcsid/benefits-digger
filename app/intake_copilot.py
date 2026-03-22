@@ -5,12 +5,34 @@ from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
+from app.gemini import INTAKE_NAVIGATION_ACTIONS, generate_intake_assistant_guidance
 from app.hybrid_explorer import interpret_hybrid_explorer_request
 from app.services import CATEGORY_LABELS
 
 
 BOOL_TRUE = {"yes", "y", "yeah", "yep", "correct", "i do", "i am", "true"}
 BOOL_FALSE = {"no", "n", "nope", "not", "false", "i do not", "i'm not", "im not"}
+LOW_SIGNAL_OPENERS = {
+    "hello",
+    "hello there",
+    "hey",
+    "hey there",
+    "hi",
+    "hi there",
+    "hola",
+    "good morning",
+    "good afternoon",
+    "good evening",
+}
+LOW_SIGNAL_GENERIC = {
+    "help",
+    "help me",
+    "i need help",
+    "need help",
+    "not sure",
+    "unsure",
+    "can you help",
+}
 
 AGE_RE = re.compile(r"\b(?:i am|i'm|im|age|turned|turning)\s+(\d{2})\b", re.IGNORECASE)
 MONEY_RE = re.compile(r"\$?\s?(\d{1,3}(?:,\d{3})+|\d{4,6})")
@@ -242,6 +264,23 @@ def _collect_story_text(description: str, messages: list[dict[str, str]]) -> str
     return " ".join(part for part in parts if part).strip()
 
 
+def _is_low_signal_opening(text: str, categories: list[str], facts: dict[str, Any]) -> bool:
+    normalized = _normalize_text(text)
+    if not normalized:
+        return True
+    if categories:
+        return False
+    meaningful_fact_keys = {key for key, value in facts.items() if value not in (None, False, "", [], {})}
+    if meaningful_fact_keys:
+        return False
+    if normalized in LOW_SIGNAL_OPENERS or normalized in LOW_SIGNAL_GENERIC:
+        return True
+    tokens = re.findall(r"[a-z0-9']+", normalized)
+    if len(tokens) <= 2:
+        return True
+    return False
+
+
 def _extract_story_facts(text: str, state_code: Optional[str]) -> dict[str, Any]:
     normalized = _normalize_text(text)
     facts: dict[str, Any] = {}
@@ -425,9 +464,17 @@ def _follow_up_queue(categories: list[str], facts: dict[str, Any]) -> list[str]:
     return deduped
 
 
-def _follow_up_payload(queue: list[str]) -> tuple[Optional[dict[str, Any]], list[dict[str, Any]]]:
+def _follow_up_payload(
+    queue: list[str],
+    *,
+    preferred_key: Optional[str] = None,
+) -> tuple[Optional[dict[str, Any]], list[dict[str, Any]]]:
+    ordered_queue = list(queue)
+    if preferred_key and preferred_key in ordered_queue:
+        ordered_queue.remove(preferred_key)
+        ordered_queue.insert(0, preferred_key)
     payload = []
-    for key in queue[:4]:
+    for key in ordered_queue[:4]:
         spec = PROBE_QUESTIONS[key]
         payload.append(
             {
@@ -463,6 +510,150 @@ def _build_chat_reply(summary: str, next_probe: Optional[dict[str, Any]]) -> str
     if next_probe is None:
         return summary + " I have enough to hand these suggestions to the screener."
     return summary + " " + next_probe["prompt"]
+
+
+def _build_low_signal_chat_reply() -> str:
+    return (
+        "Hi. I’m Zobo, and I’m here to help you sort through things like rent, food, health coverage, disability, unemployment, school costs, "
+        "or family loss. Tell me a little about what’s going on, and we’ll figure out the best next step together."
+    )
+
+
+def _friendly_probe_bridge(next_probe: Optional[dict[str, Any]]) -> Optional[str]:
+    if not next_probe:
+        return None
+    key = next_probe.get("key")
+    prompt = next_probe.get("prompt", "").strip()
+    if not prompt:
+        return None
+    if key == "state_code":
+        return "To narrow this to the right federal and state options, what state do you live in or want help in right now?"
+    if key == "applicant_income":
+        return "A quick question so I can narrow the right programs: are your income and resources limited right now?"
+    if key == "housing_urgency":
+        return "To tell apart longer-term housing help from urgent options, are you behind on rent or utilities, facing eviction, or worried about losing housing?"
+    if key == "recent_job_loss":
+        return "A quick check that helps with unemployment support: did you recently lose a job, lose hours, or have work become unstable?"
+    if key == "applicant_disability":
+        return "To see whether disability-related help may fit, do you have a disability or health condition that significantly affects daily life or work?"
+    prompt = prompt[0].lower() + prompt[1:] if len(prompt) > 1 else prompt.lower()
+    return f"A quick next question: {prompt}"
+
+
+def _build_empathy_acknowledgment(facts: dict[str, Any]) -> Optional[str]:
+    if facts.get("applicant_dolo"):
+        return "I’m sorry you’re going through that."
+    if facts.get("housing_urgency") and facts.get("food_insecurity"):
+        return "That sounds like a lot to carry at once."
+    if facts.get("recent_job_loss"):
+        return "I’m sorry things feel unstable right now."
+    if facts.get("housing_urgency"):
+        return "I’m sorry housing is feeling so stressful right now."
+    if facts.get("food_insecurity"):
+        return "I’m sorry things are this tight right now."
+    if facts.get("applicant_disability"):
+        return "That sounds really hard."
+    if facts.get("recent_disaster_impact"):
+        return "I’m sorry you’re dealing with that."
+    return None
+
+
+def _build_topic_phrase(categories: list[str]) -> Optional[str]:
+    labels = [CATEGORY_LABELS.get(category, category.replace("_", " ").title()).lower() for category in categories[:2]]
+    if not labels:
+        return None
+    if len(labels) == 1:
+        return f"We should look at {labels[0]} options."
+    return f"We should look at {labels[0]} and {labels[1]} options."
+
+
+def _build_conversational_chat_reply(
+    *,
+    categories: list[str],
+    facts: dict[str, Any],
+    next_probe: Optional[dict[str, Any]],
+) -> str:
+    parts: list[str] = []
+    empathy = _build_empathy_acknowledgment(facts)
+    topic_phrase = _build_topic_phrase(categories)
+    if empathy:
+        parts.append(empathy)
+    elif facts:
+        parts.append("Thanks for sharing that with me.")
+    else:
+        parts.append("Thanks for sharing that.")
+    if topic_phrase:
+        parts.append(topic_phrase)
+    bridge = _friendly_probe_bridge(next_probe)
+    if bridge:
+        parts.append(bridge)
+        return " ".join(parts)
+    parts.append("I have enough to line up the next steps whenever you want to keep going.")
+    return " ".join(parts)
+
+
+def _has_enough_context_to_conclude(
+    *,
+    categories: list[str],
+    facts: dict[str, Any],
+    state_code: Optional[str],
+    messages: list[dict[str, str]],
+) -> bool:
+    if not categories:
+        return False
+    user_turns = sum(1 for message in messages if message.get("role") == "user")
+    if user_turns < 1:
+        return False
+    known_fact_keys = {
+        key
+        for key, value in facts.items()
+        if value not in (None, False, "", [], {}) and key != "state_code"
+    }
+    if state_code and len(known_fact_keys) >= 2:
+        return True
+    if len(known_fact_keys) >= 3:
+        return True
+    return False
+
+
+def _build_conclusion_chat_reply(
+    *,
+    categories: list[str],
+    facts: dict[str, Any],
+    state_code: Optional[str],
+) -> str:
+    parts: list[str] = []
+    empathy = _build_empathy_acknowledgment(facts)
+    topic_phrase = _build_topic_phrase(categories)
+    if empathy:
+        parts.append(empathy)
+    else:
+        parts.append("Thanks, that gives me enough to work with.")
+    if topic_phrase:
+        parts.append(topic_phrase)
+    if state_code:
+        parts.append(f"I have enough to line up the next steps for {state_code}.")
+    else:
+        parts.append("I have enough to line up the next steps.")
+    parts.append("I’ll stop here unless you want to add anything else.")
+    return " ".join(parts)
+
+
+def _default_navigation_actions(next_probe: Optional[dict[str, Any]]) -> list[str]:
+    if next_probe is None:
+        return ["start_screening", "use_screener", "open_explorer"]
+    return ["use_screener", "open_explorer", "open_dashboard"]
+
+
+def _navigation_action_payload(action_keys: list[str]) -> list[dict[str, Any]]:
+    actions: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for key in action_keys:
+        if key in seen or key not in INTAKE_NAVIGATION_ACTIONS:
+            continue
+        seen.add(key)
+        actions.append(INTAKE_NAVIGATION_ACTIONS[key])
+    return actions
 
 
 def _merge_fact_dicts(*fact_dicts: dict[str, Any]) -> dict[str, Any]:
@@ -537,14 +728,95 @@ def interpret_life_event_intake(
 
     inferred_state_code = facts.get("state_code") or interpretation.get("applied_state_code")
     suggested_scope = _suggested_scope(scope, inferred_state_code)
-    queue = _follow_up_queue(applied_categories, facts)
-    next_probe, follow_up_questions = _follow_up_payload(queue)
+    low_signal = _is_low_signal_opening(story_text, applied_categories, facts)
+    if low_signal:
+        low_signal_actions = _navigation_action_payload(["use_screener", "open_explorer"])
+        assistant_guidance = None
+        if use_llm:
+            assistant_guidance = generate_intake_assistant_guidance(
+                description=description,
+                messages=messages,
+                summary="",
+                suggested_scope=suggested_scope,
+                state_code=inferred_state_code,
+                categories=applied_categories,
+                facts=facts,
+                available_probes=[],
+                available_navigation_actions=["use_screener", "open_explorer"],
+            )
+        return {
+            "summary": assistant_guidance.get("summary") if assistant_guidance and assistant_guidance.get("summary") else "",
+            "chat_reply": assistant_guidance.get("chat_reply") if assistant_guidance and assistant_guidance.get("chat_reply") else _build_low_signal_chat_reply(),
+            "suggested_scope": suggested_scope,
+            "applied_state_code": inferred_state_code,
+            "suggested_categories": [],
+            "structured_facts": _fact_chips(facts),
+            "current_facts": facts,
+            "prefill_answers": _prefill_answers_from_facts(facts),
+            "follow_up_questions": [],
+            "next_probe": None,
+            "navigation_actions": _navigation_action_payload(
+                assistant_guidance.get("navigation_actions") if assistant_guidance else [action["key"] for action in low_signal_actions]
+            ),
+            "interpretation_method": interpretation.get("method", "heuristic"),
+            "llm_used": interpretation.get("llm_used", False) or bool(assistant_guidance),
+            "assistant_method": "gemini+grounded" if assistant_guidance else "deterministic",
+        }
+
+    should_conclude = _has_enough_context_to_conclude(
+        categories=applied_categories,
+        facts=facts,
+        state_code=inferred_state_code,
+        messages=messages,
+    )
+    queue = [] if should_conclude else _follow_up_queue(applied_categories, facts)
     summary = _build_summary(applied_categories, facts, inferred_state_code)
+    provisional_next_probe, provisional_follow_up_questions = _follow_up_payload(queue)
+    navigation_action_keys = _default_navigation_actions(provisional_next_probe)
+    assistant_guidance = None
+    if use_llm:
+        assistant_guidance = generate_intake_assistant_guidance(
+            description=description,
+            messages=messages,
+            summary=summary,
+            suggested_scope=suggested_scope,
+            state_code=inferred_state_code,
+            categories=applied_categories,
+            facts=facts,
+            available_probes=provisional_follow_up_questions,
+            available_navigation_actions=navigation_action_keys,
+        )
+
+    preferred_probe_key = assistant_guidance.get("next_probe_key") if assistant_guidance else None
+    next_probe, follow_up_questions = _follow_up_payload(queue, preferred_key=preferred_probe_key)
+    if assistant_guidance and assistant_guidance.get("summary"):
+        summary = assistant_guidance["summary"]
     prefill_answers = _prefill_answers_from_facts(facts)
+    chat_reply = (
+        assistant_guidance.get("chat_reply")
+        if assistant_guidance and assistant_guidance.get("chat_reply")
+        else (
+            _build_conclusion_chat_reply(
+                categories=applied_categories,
+                facts=facts,
+                state_code=inferred_state_code,
+            )
+            if next_probe is None
+            else _build_conversational_chat_reply(
+                categories=applied_categories,
+                facts=facts,
+                next_probe=next_probe,
+            )
+        )
+    )
+    navigation_actions = _navigation_action_payload(
+        assistant_guidance.get("navigation_actions") if assistant_guidance else navigation_action_keys
+    )
+    assistant_llm_used = bool(assistant_guidance)
 
     return {
         "summary": summary,
-        "chat_reply": _build_chat_reply(summary, next_probe),
+        "chat_reply": chat_reply,
         "suggested_scope": suggested_scope,
         "applied_state_code": inferred_state_code,
         "suggested_categories": [
@@ -556,6 +828,8 @@ def interpret_life_event_intake(
         "prefill_answers": prefill_answers,
         "follow_up_questions": follow_up_questions,
         "next_probe": next_probe,
+        "navigation_actions": navigation_actions,
         "interpretation_method": interpretation.get("method", "heuristic"),
-        "llm_used": interpretation.get("llm_used", False),
+        "llm_used": interpretation.get("llm_used", False) or assistant_llm_used,
+        "assistant_method": "gemini+grounded" if assistant_llm_used else "deterministic",
     }

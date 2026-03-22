@@ -52,6 +52,39 @@ STATE_NAMES = {
     "AS": "American Samoa", "GU": "Guam", "PR": "Puerto Rico", "VI": "US Virgin Islands",
 }
 
+INTAKE_NAVIGATION_ACTIONS = {
+    "use_screener": {
+        "key": "use_screener",
+        "label": "Use the screener",
+        "href": "#start-screening-panel",
+        "kind": "inline_action",
+    },
+    "start_screening": {
+        "key": "start_screening",
+        "label": "Start screening",
+        "href": "action:start_screening",
+        "kind": "inline_action",
+    },
+    "open_explorer": {
+        "key": "open_explorer",
+        "label": "Open Program Explorer",
+        "href": "/explorer",
+        "kind": "route",
+    },
+    "open_results": {
+        "key": "open_results",
+        "label": "Open Results",
+        "href": "/results",
+        "kind": "route",
+    },
+    "open_dashboard": {
+        "key": "open_dashboard",
+        "label": "Open Dashboard",
+        "href": "/dashboard",
+        "kind": "route",
+    },
+}
+
 
 def _has_state_benefits(db: Session, state_code: str, categories: list[str]) -> bool:
     """Check if we already have generated benefit programs for this state."""
@@ -154,6 +187,133 @@ def _call_gemini(prompt: str) -> list[dict[str, Any]]:
     if not isinstance(programs, list):
         raise ValueError(f"Expected a JSON array from Gemini, got {type(programs)}")
     return programs
+
+
+def generate_intake_assistant_guidance(
+    *,
+    description: str,
+    messages: list[dict[str, str]],
+    summary: str,
+    suggested_scope: str,
+    state_code: Optional[str],
+    categories: list[str],
+    facts: dict[str, Any],
+    available_probes: list[dict[str, Any]],
+    available_navigation_actions: list[str],
+) -> Optional[dict[str, Any]]:
+    """Use Gemini to draft a grounded assistant reply and choose the best next navigation step."""
+    if not settings.gemini_api_key or not description.strip():
+        return None
+
+    try:
+        from google import genai
+    except Exception as exc:  # pragma: no cover - import guard
+        logger.warning("Gemini library unavailable for intake assistant: %s", exc)
+        return None
+
+    available_actions = {
+        key: INTAKE_NAVIGATION_ACTIONS[key]
+        for key in available_navigation_actions
+        if key in INTAKE_NAVIGATION_ACTIONS
+    }
+    allowed_probe_keys = [probe["key"] for probe in available_probes if probe.get("key")]
+    compact_messages = [
+        {"role": message.get("role", "user"), "content": message.get("content", "")[:500]}
+        for message in messages[-6:]
+    ]
+    fact_labels = {
+        key: value
+        for key, value in facts.items()
+        if value not in (None, "", [], {})
+    }
+
+    prompt = f"""You are Zobo, the in-product assistant inside a benefits screening web app.
+
+Your job is to help the user navigate the product and refine their situation.
+You must stay grounded in the supplied context. Do not invent programs, pages, questions, or eligibility decisions.
+
+Return ONLY a JSON object with these exact keys:
+- "summary": 1 to 2 short sentences summarizing the situation
+- "chat_reply": 1 to 3 short sentences in a helpful assistant tone
+- "next_probe_key": one of {json.dumps(allowed_probe_keys)} or null
+- "navigation_actions": array containing up to 3 values from {json.dumps(list(available_actions.keys()))}
+
+Rules:
+- Use the provided summary, categories, facts, and available probes.
+- If more detail would clearly help, choose exactly one next_probe_key from the allowlist.
+- If the user already has enough detail to move forward, set next_probe_key to null.
+- Prefer concluding once the user has given a usable situation plus at least one concrete follow-up detail, instead of continuing to fish for more.
+- Keep the chat reply concise, practical, and conversational.
+- Sound like a calm personal assistant, not a classifier or rules engine.
+- Do not start the chat reply with phrases like "This sounds most connected to".
+- Do not repeat the summary verbatim in the chat reply.
+- If the user's message is only a greeting, vague opener, or too thin to classify confidently, respond warmly, invite them to describe what is going on in a sentence or two, and set next_probe_key to null.
+- When you ask a follow-up, connect it to why it matters instead of abruptly dropping the raw question.
+- Navigation actions must reflect the current best next steps in the product.
+- Never mention a page or feature that is not in the available navigation actions.
+
+Examples of the tone to follow:
+- If the user says "hi", a good chat_reply is: "Hi. I’m Zobo. Tell me a little about what’s going on, and I can help you sort through the next steps."
+- If the user says they lost a job and are behind on rent, a good chat_reply is: "I’m sorry you’re dealing with that. We should look at housing and unemployment options. A quick question so I can narrow the right programs: what state are you in?"
+- If the user says they cannot work because of a disability, a good chat_reply is: "That sounds really hard. We should look at disability and health-related options. To point you in the right direction, are you in a specific state right now?"
+- If the user has already answered the key follow-up, a good chat_reply is: "Thanks, that gives me enough to work with. We should look at housing and food options. I have enough to line up the next steps for California."
+
+Product surfaces available in this app:
+{json.dumps(available_actions, ensure_ascii=True)}
+
+Current grounded context:
+- Existing summary: {summary}
+- Suggested scope: {suggested_scope}
+- Suggested state: {state_code or "null"}
+- Suggested categories: {json.dumps(categories)}
+- Structured facts: {json.dumps(fact_labels, ensure_ascii=True)}
+- Available follow-up probes: {json.dumps(available_probes, ensure_ascii=True)}
+- Recent conversation: {json.dumps(compact_messages, ensure_ascii=True)}
+
+Original user situation:
+{description}
+"""
+
+    try:
+        client = genai.Client(api_key=settings.gemini_api_key)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "temperature": 0.25,
+            },
+        )
+        payload = json.loads(response.text.strip())
+        if not isinstance(payload, dict):
+            return None
+
+        next_probe_key = payload.get("next_probe_key")
+        if next_probe_key not in allowed_probe_keys:
+            next_probe_key = None
+
+        navigation_actions = [
+            action for action in payload.get("navigation_actions", [])
+            if action in available_actions
+        ][:3]
+
+        summary_text = payload.get("summary")
+        if not isinstance(summary_text, str) or not summary_text.strip():
+            summary_text = None
+
+        chat_reply = payload.get("chat_reply")
+        if not isinstance(chat_reply, str) or not chat_reply.strip():
+            chat_reply = None
+
+        return {
+            "summary": summary_text,
+            "chat_reply": chat_reply,
+            "next_probe_key": next_probe_key,
+            "navigation_actions": navigation_actions,
+        }
+    except Exception as exc:  # pragma: no cover - external API fallback
+        logger.warning("Gemini intake assistant generation failed, falling back to deterministic guidance: %s", exc)
+        return None
 
 
 def _ingest_gemini_programs(db: Session, state_code: str, programs: list[dict[str, Any]]) -> int:
