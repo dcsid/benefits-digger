@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Planning Dashboard - Benefits Digger</title>
+    <title data-i18n="page.dashboardTitle">Planning Dashboard - Benefits Digger</title>
     <link rel="stylesheet" href="/static/styles.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
   </head>
@@ -16,8 +16,8 @@
         <a href="/whatif" class="nav-link" data-i18n="nav.whatif">What-If Lab</a>
         <a href="/explorer" class="nav-link" data-i18n="nav.explorer">Explorer</a>
         <select id="lang-select" class="lang-select" onchange="loadLocale(this.value)">
-          <option value="en">EN</option>
-          <option value="es">ES</option>
+          <option value="en" data-i18n="lang.en">English</option>
+          <option value="es" data-i18n="lang.es">Español</option>
         </select>
       </nav>
 
@@ -25,13 +25,13 @@
         <div class="row spread">
           <h2 data-i18n="dashboard.title">Planning Dashboard</h2>
           <div class="row">
-            <span id="plan-depth-pill" class="pill">No active session</span>
-            <button type="button" id="download-pdf" class="ghost">Download PDF</button>
+            <span id="plan-depth-pill" class="pill" data-i18n="dashboard.noSession">No active session</span>
+            <button type="button" id="download-pdf" class="ghost" data-i18n="dashboard.downloadPdf">Download PDF</button>
           </div>
         </div>
         <div id="plan-empty" class="empty empty-cta">
-          <p>No active session yet. Start a session to unlock planning summary, action steps, and missing-fact analysis.</p>
-          <a href="/">Go to Home to start a session</a>
+          <p data-i18n="dashboard.empty">No active session yet. Start a session to unlock planning summary, action steps, and missing-fact analysis.</p>
+          <a href="/" data-i18n="dashboard.goHome">Go to Home to start a session</a>
         </div>
         <div id="plan-shell" class="stack hidden">
           <div id="overview-metrics" class="metric-grid"></div>

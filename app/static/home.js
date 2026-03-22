@@ -31,14 +31,16 @@ function setStateValidation(message = "") {
 }
 
 async function loadStates() {
+  const selectedValue = stateSelect.value;
   const states = await getJson("/api/v1/jurisdictions/states");
-  stateSelect.innerHTML = '<option value="">Choose a state</option>';
+  stateSelect.innerHTML = `<option value="">${escapeHtml(t("home.chooseState"))}</option>`;
   states.forEach((item) => {
     const option = document.createElement("option");
     option.value = item.code;
     option.textContent = `${item.name} (${item.code})`;
     stateSelect.appendChild(option);
   });
+  if (selectedValue) stateSelect.value = selectedValue;
 }
 
 function selectedCategories() {
@@ -54,21 +56,19 @@ function updateStateVisibility() {
 
 function updateDepthDescription() {
   const val = parseFloat(depthSlider.value);
-  let best = depthDescriptions[0];
-  for (const d of depthDescriptions) {
-    if (Math.abs(d.at - val) < Math.abs(best.at - val)) best = d;
-  }
+  const best = getDepthDescriptor(val);
   const maxQ = Math.round(4 + val * 20);
-  depthDescription.textContent = `${best.text} (~${maxQ} questions)`;
+  depthDescription.textContent = t("home.questionsApprox", { description: best.text, count: maxQ });
 }
 
 function renderCategories() {
+  const selected = new Set(selectedCategories());
   categoryList.innerHTML = categoryDefinitions
     .map(
       (category) => `
         <label class="category-option">
-          <input type="checkbox" name="category" value="${category.value}" />
-          <span>${category.label}</span>
+          <input type="checkbox" name="category" value="${category.value}" ${selected.has(category.value) ? "checked" : ""} />
+          <span>${escapeHtml(getCategoryLabel(category.value))}</span>
         </label>
       `,
     )
@@ -85,7 +85,7 @@ function renderQuestion(question) {
   state.currentQuestion = question;
   state.isScreeningFinished = !question;
   if (!question) {
-    questionEmpty.textContent = "No more questions queued. Results are ready.";
+    questionEmpty.textContent = t("home.noMoreQuestions");
     questionEmpty.classList.remove("hidden");
     questionForm.classList.add("hidden");
     return;
@@ -94,7 +94,9 @@ function renderQuestion(question) {
   questionEmpty.classList.add("hidden");
   questionForm.classList.remove("hidden");
 
-  const hint = question.hint ? `<p class="meta">${escapeHtml(question.hint)}</p>` : "";
+  const translatedPrompt = translateDynamicText(question.prompt);
+  const translatedHintText = translateDynamicText(question.hint);
+  const hint = translatedHintText ? `<p class="meta">${escapeHtml(translatedHintText)}</p>` : "";
   let inputMarkup = "";
 
   if (question.input_type === "radio" && question.options) {
@@ -103,7 +105,7 @@ function renderQuestion(question) {
         (option) => `
           <label class="choice">
             <input type="radio" name="answer" value="${option.value}" required />
-            <span>${option.label}</span>
+            <span>${escapeHtml(translateDynamicText(option.label))}</span>
           </label>
         `,
       )
@@ -111,9 +113,9 @@ function renderQuestion(question) {
   } else if (question.input_type === "select" && question.options) {
     inputMarkup = `
       <select name="answer" required>
-        <option value="">Choose one</option>
+        <option value="">${escapeHtml(t("home.chooseOne"))}</option>
         ${question.options
-          .map((option) => `<option value="${option.value}">${option.label}</option>`)
+          .map((option) => `<option value="${option.value}">${escapeHtml(translateDynamicText(option.label))}</option>`)
           .join("")}
       </select>
     `;
@@ -128,10 +130,10 @@ function renderQuestion(question) {
   questionShell.innerHTML = `
     <div class="stack">
       <div>
-        <span class="pill">${escapeHtml(question.sensitivity_level)} sensitivity</span>
+        <span class="pill">${escapeHtml(t("home.sensitivity", { level: translateEnum("sensitivity", question.sensitivity_level, question.sensitivity_level) }))}</span>
       </div>
       <label>
-        <strong>${escapeHtml(question.prompt)}</strong>
+        <strong>${escapeHtml(translatedPrompt)}</strong>
         ${hint}
         ${inputMarkup}
       </label>
@@ -140,6 +142,7 @@ function renderQuestion(question) {
 }
 
 function renderReviewTasks(tasks) {
+  state.latestReviewTasks = tasks;
   reviewTasksNode.classList.remove("empty");
   reviewTasksNode.innerHTML = tasks.length
     ? tasks
@@ -147,16 +150,19 @@ function renderReviewTasks(tasks) {
           (task) => `
           <article class="task">
             <div class="row spread">
-              <strong>${escapeHtml(task.source_title || "Source")}</strong>
-              <span class="pill">${escapeHtml(task.status)}</span>
+              <strong>${escapeHtml(task.source_title || t("home.sourceLabel"))}</strong>
+              <span class="pill">${escapeHtml(translateEnum("reviewStatus", task.status, task.status))}</span>
             </div>
-            <p class="meta">${escapeHtml(task.diff_type)} · materiality ${task.materiality_score}</p>
+            <p class="meta">${escapeHtml(t("home.reviewTaskMeta", {
+              diffType: translateEnum("reviewDiff", task.diff_type, task.diff_type),
+              score: task.materiality_score,
+            }))}</p>
             <p><a href="${escapeHtml(task.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(task.source_url)}</a></p>
           </article>
         `,
         )
         .join("")
-    : "No review tasks yet.";
+    : t("home.noReviewTasks");
 }
 
 async function loadReviewTasks() {
@@ -179,7 +185,7 @@ function saveAdminKeyFromInput() {
   if (!adminKeyInput) return;
   setAdminKey(adminKeyInput.value);
   adminKeyInput.value = getAdminKey();
-  setStatus(getAdminKey() ? "Admin key saved for this browser tab." : "Admin key cleared.");
+  setStatus(getAdminKey() ? t("home.adminSaved") : t("home.adminCleared"));
 }
 
 function resetApp() {
@@ -198,7 +204,7 @@ function resetApp() {
 
   questionForm.classList.add("hidden");
   questionShell.innerHTML = "";
-  questionEmpty.textContent = "Start a session to begin the screener.";
+  questionEmpty.textContent = t("home.questionEmpty");
   questionEmpty.classList.remove("hidden");
 
   setStatus("");
@@ -212,17 +218,17 @@ startForm.addEventListener("submit", async (event) => {
     setStateValidation("");
     const categories = selectedCategories();
     if (!categories.length) {
-      setStatus("Select at least one category before applying your selections.");
+      setStatus(t("home.selectCategory"));
       return;
     }
     if (!scopeSelect.value) {
-      setStatus("Choose a screening scope before starting your session.");
+      setStatus(t("home.chooseScope"));
       scrollToTopOf(startScreeningPanel);
       scopeSelect.focus();
       return;
     }
     if (scopeSelect.value !== "federal" && !stateSelect.value) {
-      const msg = "Please choose a state before starting state or combined screening.";
+      const msg = t("home.chooseStateMsg");
       setStatus(msg);
       setStateValidation(msg);
       scrollToTopOf(startScreeningPanel);
@@ -232,11 +238,11 @@ startForm.addEventListener("submit", async (event) => {
 
     if (submitBtn) {
       setLoading(submitBtn, true);
-      setBusyButtonText(submitBtn, true, "Searching...", "Apply selections");
+      setBusyButtonText(submitBtn, true, t("home.searching"), t("home.apply"));
     }
 
     const hasState = scopeSelect.value !== "federal" && stateSelect.value;
-    setStatus(hasState ? "Creating session and loading state benefits..." : "Creating session...");
+    setStatus(hasState ? t("home.creatingSessionState") : t("home.creatingSession"));
     const payload = {
       scope: scopeSelect.value,
       state_code: stateSelect.value || null,
@@ -250,13 +256,13 @@ startForm.addEventListener("submit", async (event) => {
     });
     setSessionId(session.session_id);
     renderQuestion(session.next_question);
-    setStatus(`Session ${state.sessionId} is live.`);
+    setStatus(t("home.sessionLive", { sessionId: state.sessionId }));
   } catch (error) {
-    setStatus(`Could not start session: ${error.message}`);
+    setStatus(t("home.sessionError", { error: error.message }));
   } finally {
     if (submitBtn) {
       setLoading(submitBtn, false);
-      setBusyButtonText(submitBtn, false, "Searching...", "Apply selections");
+      setBusyButtonText(submitBtn, false, t("home.searching"), t("home.apply"));
     }
   }
 });
@@ -269,7 +275,7 @@ questionForm.addEventListener("submit", async (event) => {
   const formData = new FormData(questionForm);
   const value = formData.get("answer");
   if (value === null || value.toString().trim() === "") {
-    setStatus("Please choose an answer before continuing.");
+    setStatus(t("home.answerRequired"));
     return;
   }
   try {
@@ -283,9 +289,9 @@ questionForm.addEventListener("submit", async (event) => {
       }),
     });
     renderQuestion(payload.next_question);
-    setStatus(`Saved answer for ${state.currentQuestion.key}.`);
+    setStatus(t("home.answerSaved"));
   } catch (error) {
-    setStatus(`Could not save answer: ${error.message}`);
+    setStatus(t("home.answerError", { error: error.message }));
   } finally {
     if (submitBtn) setLoading(submitBtn, false);
   }
@@ -293,22 +299,23 @@ questionForm.addEventListener("submit", async (event) => {
 
 document.querySelector("#show-results").addEventListener("click", async () => {
   try {
-    setStatus("Results refreshed.");
+    setStatus(t("home.resultsRefreshed"));
   } catch (error) {
-    setStatus(`Could not refresh results: ${error.message}`);
+    setStatus(t("results.loadError", { error: error.message }));
   }
 });
 
 document.querySelector("#sync-button").addEventListener("click", async () => {
   try {
-    setStatus("Refreshing official sources...");
+    setStatus(t("home.refreshingOfficialSources"));
     const payload = await getJson("/api/v1/admin/sync", { method: "POST" });
     renderReviewTasks(payload.review_tasks || []);
-    setStatus(
-      `Official sources refreshed. Crawled ${payload.crawled_programs || 0} program sites and added ${payload.crawl_sources_added || 0} direct government page sources.`,
-    );
+    setStatus(t("home.syncSummary", {
+      crawled: payload.crawled_programs || 0,
+      added: payload.crawl_sources_added || 0,
+    }));
   } catch (error) {
-    setStatus(`Sync failed: ${error.message}`);
+    setStatus(t("home.syncFailed", { error: error.message }));
   }
 });
 
@@ -334,6 +341,24 @@ adminKeyInput?.addEventListener("keydown", (event) => {
 });
 
 document.querySelector("#reset-button").addEventListener("click", resetApp);
+
+document.addEventListener("localechange", () => {
+  renderCategories();
+  updateDepthDescription();
+  loadStates().catch((error) => setStatus(error.message));
+  if (state.currentQuestion) {
+    renderQuestion(state.currentQuestion);
+  } else if (state.isScreeningFinished) {
+    questionEmpty.textContent = t("home.noMoreQuestions");
+  } else {
+    questionEmpty.textContent = t("home.questionEmpty");
+  }
+  if (state.latestReviewTasks) {
+    renderReviewTasks(state.latestReviewTasks);
+  } else if (reviewTasksNode.classList.contains("empty")) {
+    reviewTasksNode.textContent = t("home.noReviewTasks");
+  }
+});
 
 renderCategories();
 syncAdminKeyInput();

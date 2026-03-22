@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Results - Benefits Digger</title>
+    <title data-i18n="page.resultsTitle">Results - Benefits Digger</title>
     <link rel="stylesheet" href="/static/styles.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
   </head>
@@ -16,8 +16,8 @@
         <a href="/whatif" class="nav-link" data-i18n="nav.whatif">What-If Lab</a>
         <a href="/explorer" class="nav-link" data-i18n="nav.explorer">Explorer</a>
         <select id="lang-select" class="lang-select" onchange="loadLocale(this.value)">
-          <option value="en">EN</option>
-          <option value="es">ES</option>
+          <option value="en" data-i18n="lang.en">English</option>
+          <option value="es" data-i18n="lang.es">Español</option>
         </select>
       </nav>
 
@@ -31,16 +31,16 @@
           </div>
         </div>
         <div id="no-session" class="empty empty-cta hidden">
-          <p>No active session. <a href="/">Start a screening</a> first.</p>
+          <p data-i18n="results.noSession">No active session. <a href="/">Start a screening</a> first.</p>
         </div>
         <div id="results-grid" class="results-grid">
           <div id="federal-results-column">
             <h3 data-i18n="results.federalTitle">Federal Results</h3>
-            <div id="federal-results" class="result-list empty">No federal results yet.</div>
+            <div id="federal-results" class="result-list empty" data-i18n="results.noFederal">No federal results yet.</div>
           </div>
           <div id="state-results-column">
             <h3 data-i18n="results.stateTitle">State Results</h3>
-            <div id="state-results" class="result-list empty">No state results yet.</div>
+            <div id="state-results" class="result-list empty" data-i18n="results.noState">No state results yet.</div>
           </div>
         </div>
       </section>

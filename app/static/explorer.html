@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Program Explorer - Benefits Digger</title>
+    <title data-i18n="page.explorerTitle">Program Explorer - Benefits Digger</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
@@ -15,8 +15,8 @@
         <a href="/whatif" class="nav-link" data-i18n="nav.whatif">What-If Lab</a>
         <a href="/explorer" class="nav-link nav-link--active" aria-current="page" data-i18n="nav.explorer">Explorer</a>
         <select id="lang-select" class="lang-select" onchange="loadLocale(this.value)">
-          <option value="en">EN</option>
-          <option value="es">ES</option>
+          <option value="en" data-i18n="lang.en">English</option>
+          <option value="es" data-i18n="lang.es">Español</option>
         </select>
       </nav>
 
@@ -25,39 +25,39 @@
           <h2 data-i18n="explorer.title">Program Explorer</h2>
           <button type="button" id="refresh-explorer" class="ghost" data-i18n="explorer.refresh">Refresh Explorer</button>
         </div>
-        <p class="meta">
+        <p class="meta" data-i18n="explorer.description">
           Hybrid Explorer combines plain-English need descriptions with the official catalog. It may use Gemini for interpretation when configured, and always falls back to grounded local matching.
         </p>
         <div class="dashboard-card-container">
           <form id="explorer-form" class="stack">
             <div class="results-grid">
               <label>
-                Scope
+                <span data-i18n="explorer.scope">Scope</span>
                 <select id="scope" name="scope">
-                  <option value="both">Federal and state</option>
-                  <option value="federal">Federal only</option>
-                  <option value="state">State only</option>
+                  <option value="both" data-i18n="home.scopeBoth">Federal and state</option>
+                  <option value="federal" data-i18n="home.scopeFederal">Federal only</option>
+                  <option value="state" data-i18n="home.scopeState">State only</option>
                 </select>
               </label>
               <label>
-                State
+                <span data-i18n="explorer.state">State</span>
                 <select id="state-code" name="state_code">
-                  <option value="">Choose a state</option>
+                  <option value="" data-i18n="home.chooseState">Choose a state</option>
                 </select>
               </label>
             </div>
             <label>
-              Describe what you need
-              <textarea id="explorer-description" rows="4" placeholder="Example: I lost a family member in California and need help with funeral costs and survivor benefits."></textarea>
+              <span data-i18n="explorer.describe">Describe what you need</span>
+              <textarea id="explorer-description" rows="4" placeholder="Example: I lost a family member in California and need help with funeral costs and survivor benefits." data-i18n="explorer.describePlaceholder" data-i18n-attr="placeholder"></textarea>
             </label>
             <label>
               <span data-i18n="explorer.search">Exact keyword search</span>
               <input type="text" id="explorer-query" placeholder="Try retirement, disability, funeral, veterans..." data-i18n="explorer.placeholder" data-i18n-attr="placeholder" />
             </label>
-            <button type="submit">Run hybrid search</button>
+            <button type="submit" data-i18n="explorer.submit">Run hybrid search</button>
           </form>
           <div id="explorer-insight" class="mini-card hidden"></div>
-          <div id="explorer-results" class="stack empty">Use the explorer to browse the current official program catalog.</div>
+          <div id="explorer-results" class="stack empty" data-i18n="explorer.empty">Use the explorer to browse the current official program catalog.</div>
         </div>
       </section>
     </main>
