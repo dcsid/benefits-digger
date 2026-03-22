@@ -95,6 +95,7 @@ class IntakeInterpretPayload(BaseModel):
     scope: Optional[Literal["federal", "state", "both"]] = None
     state_code: Optional[str] = None
     categories: list[str] = Field(default_factory=list)
+    current_facts: dict[str, Any] = Field(default_factory=dict)
     use_llm: bool = True
 
 

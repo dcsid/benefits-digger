@@ -101,6 +101,7 @@
   "home.lifeChatEmpty": "Empiece describiendo lo que esta viviendo y yo lo traducire en areas de beneficios y siguientes preguntas.",
   "home.lifeChatInputLabel": "Responder al asistente",
   "home.lifeChatWelcome": "Hola. Soy Zobo. Cuénteme un poco de lo que esta pasando y le ayudare a ordenar los siguientes pasos.",
+  "home.lifeChatWelcomeSession": "Hola. Soy Zobo. Puedo acompañarlo mientras revisa esta sesion. Pregunteme por un resultado, un dato faltante o el siguiente paso.",
   "home.lifeChatPlaceholder": "Pruebe: perdi mi trabajo, estoy atrasado con la renta y necesito ayuda con comida.",
   "home.lifeChatPlaceholderYesNo": "Aqui basta con un si o no corto.",
   "home.lifeChatPlaceholderState": "Responda con un estado como CA, California o Nueva York.",

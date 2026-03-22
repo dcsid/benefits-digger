@@ -42,6 +42,18 @@ const intakeState = {
   isProbeLoading: false,
 };
 
+function syncSharedZoboState() {
+  if (typeof window.syncZoboSharedState !== "function") return;
+  window.syncZoboSharedState({
+    description: intakeState.description,
+    payload: intakeState.payload,
+    messages: intakeState.messages,
+    pendingQuestionKey: intakeState.pendingQuestionKey,
+    chatOpen: intakeState.chatOpen,
+    autoOpenedProbeKey: intakeState.autoOpenedProbeKey,
+  });
+}
+
 function syncBackButtons() {
   const canGoBackInForm = !state.isScreeningFinished && questionCursor > 0;
   const canGoBackFromComplete = state.isScreeningFinished && questionTrail.length > 0;
@@ -350,6 +362,7 @@ function resetLifeChat() {
   intakeState.autoOpenedProbeKey = null;
   intakeState.isProbeLoading = false;
   if (lifeChatMessages) lifeChatMessages.innerHTML = "";
+  syncSharedZoboState();
 }
 
 function setLifeChatOpen(open, { focusInput = false } = {}) {
@@ -358,6 +371,7 @@ function setLifeChatOpen(open, { focusInput = false } = {}) {
   if (lifeChatLauncher) {
     lifeChatLauncher.setAttribute("aria-expanded", intakeState.chatOpen ? "true" : "false");
   }
+  syncSharedZoboState();
   if (focusInput && intakeState.chatOpen && lifeChatInput) {
     requestAnimationFrame(() => lifeChatInput.focus());
   }
@@ -458,6 +472,7 @@ function renderLifeChat() {
     intakeState.autoOpenedProbeKey = probeKey;
     setLifeChatOpen(true, { focusInput: true });
   }
+  syncSharedZoboState();
 }
 
 function renderLifeIntake(payload) {
@@ -476,6 +491,9 @@ function clearLifeIntake() {
   closeLifeChat();
   resetLifeChat();
   if (lifeChatInput) lifeChatInput.value = "";
+  if (typeof window.clearZoboSharedState === "function") {
+    window.clearZoboSharedState();
+  }
   renderLifeIntake(null);
 }
 

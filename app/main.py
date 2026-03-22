@@ -211,6 +211,7 @@ def life_event_intake(payload: IntakeInterpretPayload, db: Session = Depends(get
         scope=payload.scope,
         state_code=payload.state_code,
         categories=payload.categories,
+        current_facts=payload.current_facts,
         use_llm=payload.use_llm,
     )
 

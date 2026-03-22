@@ -101,6 +101,7 @@
   "home.lifeChatEmpty": "Start by describing what you are dealing with, and I will translate it into benefit areas and next questions.",
   "home.lifeChatInputLabel": "Reply to the assistant",
   "home.lifeChatWelcome": "Hi. I’m Zobo. Tell me a little about what’s going on, and I’ll help you sort through the next steps.",
+  "home.lifeChatWelcomeSession": "Hi. I’m Zobo. I can stay with you while you review this session. Ask me to explain a result, a missing fact, or what to do next.",
   "home.lifeChatPlaceholder": "Try: I lost my job, I am behind on rent, and I need help with food.",
   "home.lifeChatPlaceholderYesNo": "A short yes or no is enough here.",
   "home.lifeChatPlaceholderState": "Reply with a state like CA, California, or New York.",
