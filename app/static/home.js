@@ -62,7 +62,8 @@ function updateDepthDescription() {
     if (Math.abs(d.at - val) < Math.abs(best.at - val)) best = d;
   }
   const maxQ = estimateDepthQuestionCount(val);
-  depthDescription.textContent = `${best.text} (~${maxQ} questions)`;
+  const descriptor = getDepthDescriptor(best.at);
+  depthDescription.textContent = t("home.breadthApprox", { description: descriptor.text, count: maxQ });
 
   depthPills.forEach((pill) => {
     const pillValue = parseFloat(pill.dataset.depthValue || "0");

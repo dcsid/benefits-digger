@@ -254,27 +254,29 @@ def test_session_flow_returns_federal_and_state_results() -> None:
         assert payload["state_results"][0]["jurisdiction"]["code"] == "NY"
 
 
-def test_deep_mode_is_more_aggressive_than_quick() -> None:
+def test_breadth_controls_how_many_questions_are_asked() -> None:
     with TestClient(app) as client:
-        quick_response = client.post(
+        narrow_response = client.post(
             "/api/v1/sessions",
             json={
                 "scope": "federal",
                 "categories": ["all"],
-                "depth_mode": "quick",
+                "breadth_value": 0.0,
+                "depth_value": 1.0,
             },
         )
-        deep_response = client.post(
+        broad_response = client.post(
             "/api/v1/sessions",
             json={
                 "scope": "federal",
                 "categories": ["all"],
-                "depth_mode": "deep",
+                "breadth_value": 1.0,
+                "depth_value": 1.0,
             },
         )
 
-        assert quick_response.status_code == 200
-        assert deep_response.status_code == 200
+        assert narrow_response.status_code == 200
+        assert broad_response.status_code == 200
 
         seeded_answers = {
             "applicant_paid_into_SS": "Yes",
@@ -283,19 +285,62 @@ def test_deep_mode_is_more_aggressive_than_quick() -> None:
             "applicant_dolo": "No",
         }
 
-        quick_follow_up = client.post(
-            f"/api/v1/sessions/{quick_response.json()['session_id']}/answers",
+        narrow_follow_up = client.post(
+            f"/api/v1/sessions/{narrow_response.json()['session_id']}/answers",
             json={"answers": seeded_answers},
         )
-        deep_follow_up = client.post(
-            f"/api/v1/sessions/{deep_response.json()['session_id']}/answers",
+        broad_follow_up = client.post(
+            f"/api/v1/sessions/{broad_response.json()['session_id']}/answers",
             json={"answers": seeded_answers},
         )
 
-        assert quick_follow_up.status_code == 200
-        assert deep_follow_up.status_code == 200
-        assert quick_follow_up.json()["next_question"] is None
-        assert deep_follow_up.json()["next_question"] is not None
+        assert narrow_follow_up.status_code == 200
+        assert broad_follow_up.status_code == 200
+        assert narrow_follow_up.json()["next_question"] is None
+        assert broad_follow_up.json()["next_question"] is not None
+
+
+def test_depth_controls_question_specificity() -> None:
+    with TestClient(app) as client:
+        high_level_response = client.post(
+            "/api/v1/sessions",
+            json={
+                "scope": "federal",
+                "categories": ["retirement_seniors"],
+                "breadth_value": 1.0,
+                "depth_value": 0.0,
+            },
+        )
+        detailed_response = client.post(
+            "/api/v1/sessions",
+            json={
+                "scope": "federal",
+                "categories": ["retirement_seniors"],
+                "breadth_value": 1.0,
+                "depth_value": 1.0,
+            },
+        )
+
+        assert high_level_response.status_code == 200
+        assert detailed_response.status_code == 200
+
+        def advance_to_age_question(session_id: str) -> dict:
+            session_response = client.post(
+                f"/api/v1/sessions/{session_id}/answers",
+                json={"answers": {"applicant_paid_into_SS": "Yes"}},
+            )
+            assert session_response.status_code == 200
+            return session_response.json()["next_question"]
+
+        high_level_question = advance_to_age_question(high_level_response.json()["session_id"])
+        detailed_question = advance_to_age_question(detailed_response.json()["session_id"])
+
+        assert high_level_question["key"] == "applicant_date_of_birth"
+        assert detailed_question["key"] == "applicant_date_of_birth"
+        assert high_level_question["input_type"] == "number"
+        assert detailed_question["input_type"] == "date"
+        assert "approximate age" in high_level_question["prompt"].lower()
+        assert "exact date of birth" in detailed_question["prompt"].lower()
 
 
 def test_plan_compare_and_catalog_endpoints_work() -> None:

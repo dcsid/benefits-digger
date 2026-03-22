@@ -10,7 +10,8 @@ class SessionCreatePayload(BaseModel):
     state_code: Optional[str] = None
     categories: list[str] = Field(default_factory=list)
     depth_mode: Optional[Literal["quick", "standard", "deep"]] = None
-    depth_value: float = Field(default=0.5, ge=0.0, le=1.0)
+    breadth_value: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    depth_value: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
     @model_validator(mode="after")
     def _require_state_for_state_scope(self):
@@ -19,10 +20,23 @@ class SessionCreatePayload(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def _resolve_depth(self):
-        if self.depth_mode is not None and self.depth_value == 0.5:
-            mapping = {"quick": 0.0, "standard": 0.5, "deep": 1.0}
-            self.depth_value = mapping.get(self.depth_mode, 0.5)
+    def _resolve_controls(self):
+        mapping = {"quick": 0.0, "standard": 0.5, "deep": 1.0}
+        legacy_value = mapping.get(self.depth_mode) if self.depth_mode is not None else None
+
+        if self.breadth_value is None:
+            if legacy_value is not None:
+                self.breadth_value = legacy_value
+            elif self.depth_value is not None:
+                self.breadth_value = self.depth_value
+            else:
+                self.breadth_value = 0.5
+
+        if self.depth_value is None:
+            if legacy_value is not None:
+                self.depth_value = legacy_value
+            else:
+                self.depth_value = 0.5
         return self
 
 

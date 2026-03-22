@@ -20,9 +20,16 @@ function renderPlan(plan) {
 
   planShell.classList.remove("hidden");
   planEmpty.classList.add("hidden");
+  const breadthValue = plan.profile.breadth_value ?? 0.5;
   const dv = plan.profile.depth_value ?? 0.5;
-  const tierLabel = getDepthDescriptor(dv).label;
-  planDepthPill.textContent = t("dashboard.depthPill", { tier: tierLabel, percent: Math.round(dv * 100) });
+  const breadthLabel = getBreadthDescriptor(breadthValue).label;
+  const depthLabel = getDepthDescriptor(dv).label;
+  planDepthPill.textContent = t("dashboard.controlsPill", {
+    breadthLabel,
+    breadthPercent: Math.round(breadthValue * 100),
+    depthLabel,
+    depthPercent: Math.round(dv * 100),
+  });
 
   const estMonthly = plan.overview.estimated_monthly_total;
   const metrics = [

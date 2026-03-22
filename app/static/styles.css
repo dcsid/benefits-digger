@@ -630,9 +630,9 @@ button:disabled {
   }
 }
 
-/* ── Depth slider ──────────────────────────────────────────────── */
+/* ── Screening sliders ─────────────────────────────────────────── */
 
-input[type="range"]#depth-slider {
+input[type="range"].control-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
@@ -643,7 +643,7 @@ input[type="range"]#depth-slider {
   margin: 0.5rem 0 0.2rem;
 }
 
-input[type="range"]#depth-slider::-webkit-slider-thumb {
+input[type="range"].control-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 20px;
@@ -655,7 +655,7 @@ input[type="range"]#depth-slider::-webkit-slider-thumb {
   cursor: pointer;
 }
 
-input[type="range"]#depth-slider::-moz-range-thumb {
+input[type="range"].control-slider::-moz-range-thumb {
   width: 20px;
   height: 20px;
   border-radius: 50%;
