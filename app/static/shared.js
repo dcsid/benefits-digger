@@ -70,6 +70,7 @@ function setSessionId(id) {
   state.sessionId = id;
   if (id) localStorage.setItem("bd_session_id", id);
   else localStorage.removeItem("bd_session_id");
+  updateResultsNavVisibility();
 }
 
 function setActiveScope(scope) {
@@ -99,8 +100,15 @@ function setScreeningFinished(finished) {
 function updateResultsNavVisibility() {
   const navResults = document.querySelector("#nav-results");
   if (!navResults) return;
-  if (state.isScreeningFinished) navResults.classList.remove("hidden");
-  else navResults.classList.add("hidden");
+  const enabled = Boolean(state.sessionId) || window.location.pathname === "/results";
+  navResults.classList.remove("hidden");
+  navResults.classList.toggle("nav-link--disabled", !enabled);
+  navResults.setAttribute("aria-disabled", enabled ? "false" : "true");
+  if (enabled) {
+    navResults.removeAttribute("tabindex");
+  } else {
+    navResults.setAttribute("tabindex", "-1");
+  }
 }
 
 const categoryDefinitions = [
@@ -564,7 +572,7 @@ function renderResultCard(item) {
   `;
 }
 
-// Show/hide Results nav link based on screening state on every page load
+// Keep the Results nav visible across the site, but disable it until a session exists.
 updateResultsNavVisibility();
 
 const ZOBO_STORAGE_KEY = "bd_zobo_state";

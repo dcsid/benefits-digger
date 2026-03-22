@@ -1551,6 +1551,20 @@ input[type="range"].control-slider::-moz-range-thumb {
   color: white;
 }
 
+.nav-link--disabled,
+.nav-link[aria-disabled="true"] {
+  background: rgba(31, 42, 36, 0.06);
+  color: rgba(67, 83, 77, 0.45);
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.nav-link--disabled:hover,
+.nav-link[aria-disabled="true"]:hover {
+  background: rgba(31, 42, 36, 0.06);
+  color: rgba(67, 83, 77, 0.45);
+}
+
 .nav-link--active {
   background: var(--accent);
   color: white;
