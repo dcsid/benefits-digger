@@ -49,27 +49,21 @@
           </label>
 
           <label>
-            <span data-i18n="home.breadth">Breadth</span>
-            <input type="range" id="breadth-slider" class="control-slider" name="breadth_value"
-                   min="0" max="1" step="0.01" value="0.5" />
-            <div class="depth-labels">
-              <span data-i18n="home.breadthFocused">Focused</span>
-              <span data-i18n="home.breadthBalanced">Balanced</span>
-              <span data-i18n="home.breadthBroad">Broad</span>
-            </div>
-          </label>
-          <p id="breadth-description" class="meta">
-            Balanced explores a moderate number of possible programs before stopping. (~10 questions)
-          </p>
-
-          <label>
             <span data-i18n="home.depth">Depth</span>
-            <input type="range" id="depth-slider" class="control-slider" name="depth_value"
-                   min="0" max="1" step="0.01" value="0.5" />
-            <div class="depth-labels">
-              <span data-i18n="home.depthLight">High-level</span>
-              <span data-i18n="home.depthStandard">Standard</span>
-              <span data-i18n="home.depthDetailed">Detailed</span>
+            <input type="range" id="depth-slider" name="depth_value" min="0" max="1" step="0.01" value="0.5" />
+            <div class="depth-pills" role="group" aria-label="Depth presets">
+              <button type="button" class="depth-pill" data-depth-value="0">
+                <strong data-i18n="home.depthQuick">Quick</strong>
+                <span class="meta">~4 questions</span>
+              </button>
+              <button type="button" class="depth-pill" data-depth-value="0.5">
+                <strong data-i18n="home.depthStandard">Standard</strong>
+                <span class="meta">~10 questions</span>
+              </button>
+              <button type="button" class="depth-pill" data-depth-value="1">
+                <strong data-i18n="home.depthDeep">Deep</strong>
+                <span class="meta">~24 questions</span>
+              </button>
             </div>
           </label>
           <p id="depth-description" class="meta">

@@ -100,18 +100,18 @@ function updateResultsNavVisibility() {
 }
 
 const categoryDefinitions = [
-  { value: "children_families", labelKey: "category.children_families" },
-  { value: "death", labelKey: "category.death" },
-  { value: "disabilities", labelKey: "category.disabilities" },
-  { value: "disasters", labelKey: "category.disasters" },
-  { value: "education", labelKey: "category.education" },
-  { value: "food", labelKey: "category.food" },
-  { value: "health", labelKey: "category.health" },
-  { value: "housing_utilities", labelKey: "category.housing_utilities" },
-  { value: "jobs_unemployment", labelKey: "category.jobs_unemployment" },
-  { value: "military_veterans", labelKey: "category.military_veterans" },
-  { value: "retirement_seniors", labelKey: "category.retirement_seniors" },
-  { value: "welfare_cash_assistance", labelKey: "category.welfare_cash_assistance" },
+  { value: "children_families", label: "Children and families", labelKey: "category.children_families", icon: "👨‍👩‍👧" },
+  { value: "death", label: "Death", labelKey: "category.death", icon: "🕊️" },
+  { value: "disabilities", label: "Disabilities", labelKey: "category.disabilities", icon: "♿" },
+  { value: "disasters", label: "Disasters", labelKey: "category.disasters", icon: "🌪️" },
+  { value: "education", label: "Education", labelKey: "category.education", icon: "🎓" },
+  { value: "food", label: "Food", labelKey: "category.food", icon: "🍎" },
+  { value: "health", label: "Health", labelKey: "category.health", icon: "🩺" },
+  { value: "housing_utilities", label: "Housing and utilities", labelKey: "category.housing_utilities", icon: "🏠" },
+  { value: "jobs_unemployment", label: "Jobs and unemployment", labelKey: "category.jobs_unemployment", icon: "💼" },
+  { value: "military_veterans", label: "Military and veterans", labelKey: "category.military_veterans", icon: "🎖️" },
+  { value: "retirement_seniors", label: "Retirement and seniors", labelKey: "category.retirement_seniors", icon: "👵" },
+  { value: "welfare_cash_assistance", label: "Welfare and cash assistance", labelKey: "category.welfare_cash_assistance", icon: "💵" },
 ];
 
 const breadthDescriptions = [

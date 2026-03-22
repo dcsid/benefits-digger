@@ -2,9 +2,8 @@ const scopeSelect = document.querySelector("#scope");
 const stateSelect = document.querySelector("#state-code");
 const stateValidation = document.querySelector("#state-validation");
 const startScreeningPanel = document.querySelector("#start-screening-panel");
-const breadthSlider = document.querySelector("#breadth-slider");
-const breadthDescription = document.querySelector("#breadth-description");
 const depthSlider = document.querySelector("#depth-slider");
+const depthPills = [...document.querySelectorAll(".depth-pill")];
 const depthDescription = document.querySelector("#depth-description");
 const startForm = document.querySelector("#start-form");
 const questionForm = document.querySelector("#question-form");
@@ -56,17 +55,33 @@ function updateStateVisibility() {
   if (scope === "federal") setStateValidation("");
 }
 
-function updateBreadthDescription() {
-  const val = parseFloat(breadthSlider.value);
-  const best = getBreadthDescriptor(val);
-  const maxQ = estimateBreadthQuestionCount(val);
-  breadthDescription.textContent = t("home.breadthApprox", { description: best.text, count: maxQ });
-}
-
 function updateDepthDescription() {
   const val = parseFloat(depthSlider.value);
-  const best = getDepthDescriptor(val);
-  depthDescription.textContent = t("home.depthApprox", { description: best.text });
+  let best = depthDescriptions[0];
+  for (const d of depthDescriptions) {
+    if (Math.abs(d.at - val) < Math.abs(best.at - val)) best = d;
+  }
+  const maxQ = estimateDepthQuestionCount(val);
+  const descriptor = getDepthDescriptor(best.at);
+  depthDescription.textContent = t("home.breadthApprox", { description: descriptor.text, count: maxQ });
+
+  depthPills.forEach((pill) => {
+    const pillValue = parseFloat(pill.dataset.depthValue || "0");
+    const isActive = Math.abs(pillValue - best.at) < 0.001;
+    pill.classList.toggle("active", isActive);
+    pill.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+function estimateDepthQuestionCount(depthValue) {
+  // Keep this consistent with backend DEPTH_ANCHORS interpolation.
+  const v = Math.max(0, Math.min(1, depthValue));
+  if (v <= 0.5) {
+    const t = v / 0.5;
+    return Math.round(4 + (10 - 4) * t);
+  }
+  const t = (v - 0.5) / 0.5;
+  return Math.round(10 + (24 - 10) * t);
 }
 
 function renderCategories() {
@@ -75,8 +90,10 @@ function renderCategories() {
     .map(
       (category) => `
         <label class="category-option">
-          <input type="checkbox" name="category" value="${category.value}" ${selected.has(category.value) ? "checked" : ""} />
-          <span>${escapeHtml(getCategoryLabel(category.value))}</span>
+          <input type="checkbox" name="category" value="${category.value}" />
+          <span class="category-icon" aria-hidden="true">${category.icon || "•"}</span>
+          <span>${category.label}</span>
+
         </label>
       `,
     )
@@ -134,6 +151,7 @@ function renderQuestion(question) {
   } else {
     inputMarkup = '<input type="text" name="answer" required />';
   }
+
 
   questionShell.innerHTML = `
     <div class="stack">
@@ -195,11 +213,9 @@ function resetApp() {
 
   scopeSelect.value = "both";
   stateSelect.value = "";
-  breadthSlider.value = 0.5;
-  depthSlider.value = 0.5;
+  depthSlider.value = "0.5";
   setAllCategories(false);
   updateStateVisibility();
-  updateBreadthDescription();
   updateDepthDescription();
 
   questionForm.classList.add("hidden");
@@ -247,7 +263,6 @@ startForm.addEventListener("submit", async (event) => {
       scope: scopeSelect.value,
       state_code: stateSelect.value || null,
       categories,
-      breadth_value: parseFloat(breadthSlider.value),
       depth_value: parseFloat(depthSlider.value),
     };
     setActiveScope(payload.scope);
@@ -308,14 +323,32 @@ scopeSelect.addEventListener("change", updateStateVisibility);
 stateSelect.addEventListener("change", () => {
   if (stateSelect.value) setStateValidation("");
 });
-breadthSlider.addEventListener("input", updateBreadthDescription);
 depthSlider.addEventListener("input", updateDepthDescription);
+depthPills.forEach((pill) => {
+  pill.addEventListener("click", () => {
+    const target = pill.dataset.depthValue;
+    if (target == null) return;
+    depthSlider.value = target;
+    updateDepthDescription();
+  });
+});
+saveAdminKeyButton?.addEventListener("click", saveAdminKeyFromInput);
+clearAdminKeyButton?.addEventListener("click", () => {
+  if (!adminKeyInput) return;
+  adminKeyInput.value = "";
+  saveAdminKeyFromInput();
+});
+adminKeyInput?.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    saveAdminKeyFromInput();
+  }
+});
 
 document.querySelector("#reset-button").addEventListener("click", resetApp);
 
 document.addEventListener("localechange", () => {
   renderCategories();
-  updateBreadthDescription();
   updateDepthDescription();
   loadStates().catch((error) => setStatus(error.message));
   if (state.currentQuestion) {
@@ -338,5 +371,4 @@ renderCategories();
 loadStates()
   .catch((error) => setStatus(error.message));
 updateStateVisibility();
-updateBreadthDescription();
 updateDepthDescription();
