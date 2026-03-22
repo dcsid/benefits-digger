@@ -1,9 +1,13 @@
+@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap");
+
 :root {
   --bg: #f3eee4;
   --panel: rgba(255, 252, 246, 0.92);
   --text: #1f2a24;
-  --muted: #61706a;
+  --muted: #43534d;
   --accent: #0b6e4f;
+  --primary-cta: #0a4e66;
+  --primary-cta-hover: #083a4d;
   --accent-soft: #d9efe6;
   --line: rgba(31, 42, 36, 0.12);
   --warn: #7a2f20;
@@ -22,7 +26,7 @@ body {
     radial-gradient(circle at top left, rgba(11, 110, 79, 0.18), transparent 28rem),
     radial-gradient(circle at top right, rgba(199, 125, 67, 0.18), transparent 24rem),
     linear-gradient(160deg, #f7f0e3 0%, #efe8dd 45%, #e5ece7 100%);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Public Sans", "Segoe UI", sans-serif;
 }
 
 .layout {
@@ -64,8 +68,21 @@ body {
 }
 
 .start-button {
-  padding: 1rem 1.35rem;
-  font-size: 1.05rem;
+  padding: 1rem 1.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+#start-form .start-button {
+  min-height: 52px;
+  padding: 1rem 2.2rem;
+  font-size: 1.15rem;
+  background: var(--primary-cta);
+  box-shadow: 0 10px 24px rgba(10, 78, 102, 0.26);
+}
+
+#start-form .start-button:hover {
+  background: var(--primary-cta-hover);
 }
 
 #question-complete-actions {
@@ -96,6 +113,8 @@ body {
   letter-spacing: 0.14em;
   font-size: 0.78rem;
   color: var(--accent);
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
 }
 
 h1,
@@ -180,8 +199,23 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: white;
-  padding: 0.8rem 0.9rem;
+  padding: 0.85rem 0.95rem;
+  min-height: 46px;
   font: inherit;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) calc(50% - 3px),
+    calc(100% - 14px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 2.35rem;
 }
 
 textarea {
@@ -204,10 +238,60 @@ button {
   border: none;
   border-radius: 999px;
   padding: 0.85rem 1.2rem;
+  min-height: 44px;
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
   background: var(--accent);
   color: white;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(31, 42, 36, 0.16);
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(11, 110, 79, 0.24);
+  border-color: rgba(11, 110, 79, 0.64);
+}
+
+#depth-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #cfe8dc 0%, #0b6e4f 100%);
+  outline: none;
+  margin: 0.15rem 0 0.35rem;
+}
+
+#depth-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0b6e4f;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(31, 42, 36, 0.26);
+  cursor: pointer;
+}
+
+#depth-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0b6e4f;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(31, 42, 36, 0.26);
+  cursor: pointer;
 }
 
 button.ghost {
@@ -232,7 +316,9 @@ fieldset {
 }
 
 .category-grid {
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .depth-pills {
@@ -268,13 +354,18 @@ fieldset {
 }
 
 .category-option {
+  position: relative;
   align-items: center;
-  grid-template-columns: auto auto 1fr;
-  gap: 0.65rem;
-  padding: 0.8rem 0.9rem;
+  justify-items: center;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto;
+  gap: 0.45rem;
+  min-height: 64px;
+  padding: 0.95rem 1rem;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.9);
+  text-align: center;
   cursor: pointer;
   transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
 }
@@ -286,12 +377,26 @@ fieldset {
 
 .category-option:has(input:checked) {
   border-color: var(--accent);
-  background: #e7f4ee;
+  background: #e4f3eb;
+  box-shadow: 0 0 0 2px rgba(11, 110, 79, 0.18);
 }
 
 .category-icon {
-  font-size: 1rem;
+  font-size: 1.35rem;
   line-height: 1;
+}
+
+.category-option > span:last-child {
+  font-size: 0.96rem;
+  font-weight: 600;
+}
+
+.category-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .choice {
@@ -502,6 +607,13 @@ fieldset {
   scrollbar-gutter: stable;
   padding-right: 10px;
   align-content: start;
+  scroll-snap-type: y mandatory;
+}
+
+#federal-results > .card,
+#state-results > .card {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 
 #federal-results::-webkit-scrollbar,
@@ -822,6 +934,10 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   #federal-results,
   #state-results {
     max-height: 52vh;
@@ -838,6 +954,12 @@ button:disabled {
     max-height: none;
     overflow: visible;
     padding-right: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .category-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -891,11 +1013,16 @@ input[type="range"].control-slider::-moz-range-thumb {
 }
 
 .nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   padding: 0.45rem 0.85rem;
+  min-height: 36px;
   background: var(--accent-soft);
   color: var(--accent);
   font-size: 0.88rem;
+  text-align: center;
   text-decoration: none;
   transition: background 0.15s, color 0.15s;
 }

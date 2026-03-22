@@ -15,23 +15,19 @@ function scrollToResultCard(container, direction) {
     return;
   }
 
-  const containerTop = container.getBoundingClientRect().top;
-  const currentIndex = cards.findIndex((card) => {
-    const rect = card.getBoundingClientRect();
-    return rect.top <= containerTop + 12 && rect.bottom > containerTop + 12;
-  });
-
-  const normalizedIndex = currentIndex === -1
-    ? (container.scrollTop <= 2 ? 0 : cards.length - 1)
-    : currentIndex;
+  const currentTop = container.scrollTop;
+  const offsets = cards.map((card) => card.offsetTop);
+  const closestIndex = offsets.reduce((bestIndex, offset, index) => {
+    const bestDistance = Math.abs(offsets[bestIndex] - currentTop);
+    const distance = Math.abs(offset - currentTop);
+    return distance < bestDistance ? index : bestIndex;
+  }, 0);
 
   const targetIndex = direction === "down"
-    ? Math.min(cards.length - 1, normalizedIndex + 1)
-    : Math.max(0, normalizedIndex - 1);
+    ? Math.min(cards.length - 1, closestIndex + 1)
+    : Math.max(0, closestIndex - 1);
 
-  const targetRect = cards[targetIndex].getBoundingClientRect();
-  const targetTop = container.scrollTop + (targetRect.top - containerTop);
-  container.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+  container.scrollTo({ top: Math.max(0, offsets[targetIndex]), behavior: "smooth" });
 }
 
 function redoScreening() {
