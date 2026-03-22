@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.llm import build_gemini_config, get_gemini_client, get_gemini_model
 from app.models import Jurisdiction, Program
 from app.services import (
     CATEGORY_LABELS,
@@ -277,12 +278,6 @@ def _try_llm_interpretation(
     if not settings.gemini_api_key or not description.strip():
         return None
 
-    try:
-        from google import genai
-    except Exception as exc:  # pragma: no cover - import guard
-        logger.warning("Gemini library unavailable for explorer interpretation: %s", exc)
-        return None
-
     available_states = [row.code for row in _available_states(db)]
     valid_categories = list(CATEGORY_LABELS.keys())
     prompt = f"""You are helping an official government benefits catalog search.
@@ -292,11 +287,12 @@ Convert the user's description into a compact JSON object with these exact keys:
 - "state_code": one of {json.dumps(available_states)} or null
 - "scope": one of ["federal", "state", "both"] or null
 - "categories": array containing zero or more of {json.dumps(valid_categories)}
-- "search_terms": array of up to 8 short search terms
+- "search_terms": array of up to 12 short search terms
 
 Rules:
 - Do not invent programs or benefits.
 - Keep categories broad and grounded in the user's actual need.
+- It is okay to include adjacent benefit categories when they are strongly implied by the description.
 - If the user mentions a state, extract it.
 - If the explicit product filters already specify a scope/state/categories, you may reinforce them but do not contradict them.
 - Return ONLY JSON.
@@ -311,14 +307,15 @@ User description:
 """
 
     try:
-        client = genai.Client(api_key=settings.gemini_api_key)
+        client = get_gemini_client()
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=get_gemini_model(),
             contents=prompt,
-            config={
-                "response_mime_type": "application/json",
-                "temperature": 0.1,
-            },
+            config=build_gemini_config(
+                response_mime_type="application/json",
+                temperature=0.35,
+                structured=True,
+            ),
         )
         payload = json.loads(response.text.strip())
         if not isinstance(payload, dict):

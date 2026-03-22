@@ -691,7 +691,7 @@ def test_hybrid_explorer_supports_plain_english_description_without_llm() -> Non
                 "description": "My family member died of COVID in California and I need help with funeral costs and survivor benefits.",
                 "scope": "both",
                 "limit": 10,
-                "use_llm": True,
+                "use_llm": False,
             },
         )
         assert response.status_code == 200
