@@ -3,6 +3,7 @@ const stateSelect = document.querySelector("#state-code");
 const stateValidation = document.querySelector("#state-validation");
 const startScreeningPanel = document.querySelector("#start-screening-panel");
 const depthSlider = document.querySelector("#depth-slider");
+const depthPills = [...document.querySelectorAll(".depth-pill")];
 const depthDescription = document.querySelector("#depth-description");
 const startForm = document.querySelector("#start-form");
 const questionForm = document.querySelector("#question-form");
@@ -58,8 +59,26 @@ function updateDepthDescription() {
   for (const d of depthDescriptions) {
     if (Math.abs(d.at - val) < Math.abs(best.at - val)) best = d;
   }
-  const maxQ = Math.round(4 + val * 20);
+  const maxQ = estimateDepthQuestionCount(val);
   depthDescription.textContent = `${best.text} (~${maxQ} questions)`;
+
+  depthPills.forEach((pill) => {
+    const pillValue = parseFloat(pill.dataset.depthValue || "0");
+    const isActive = Math.abs(pillValue - best.at) < 0.001;
+    pill.classList.toggle("active", isActive);
+    pill.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+}
+
+function estimateDepthQuestionCount(depthValue) {
+  // Keep this consistent with backend DEPTH_ANCHORS interpolation.
+  const v = Math.max(0, Math.min(1, depthValue));
+  if (v <= 0.5) {
+    const t = v / 0.5;
+    return Math.round(4 + (10 - 4) * t);
+  }
+  const t = (v - 0.5) / 0.5;
+  return Math.round(10 + (24 - 10) * t);
 }
 
 function renderCategories() {
@@ -68,6 +87,7 @@ function renderCategories() {
       (category) => `
         <label class="category-option">
           <input type="checkbox" name="category" value="${category.value}" />
+          <span class="category-icon" aria-hidden="true">${category.icon || "•"}</span>
           <span>${category.label}</span>
         </label>
       `,
@@ -191,7 +211,7 @@ function resetApp() {
 
   scopeSelect.value = "both";
   stateSelect.value = "";
-  depthSlider.value = 0.5;
+  depthSlider.value = "0.5";
   setAllCategories(false);
   updateStateVisibility();
   updateDepthDescription();
@@ -320,6 +340,14 @@ stateSelect.addEventListener("change", () => {
   if (stateSelect.value) setStateValidation("");
 });
 depthSlider.addEventListener("input", updateDepthDescription);
+depthPills.forEach((pill) => {
+  pill.addEventListener("click", () => {
+    const target = pill.dataset.depthValue;
+    if (target == null) return;
+    depthSlider.value = target;
+    updateDepthDescription();
+  });
+});
 saveAdminKeyButton?.addEventListener("click", saveAdminKeyFromInput);
 clearAdminKeyButton?.addEventListener("click", () => {
   if (!adminKeyInput) return;
