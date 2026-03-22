@@ -26,18 +26,18 @@
           <span class="pill" data-i18n="whatif.pill">Scenario compare</span>
         </div>
         <p id="status" class="status"></p>
-        <div id="no-session" class="empty empty-cta hidden">
+        <div id="no-session" class="empty-cta hidden">
           <p data-i18n="whatif.quickStartIntro">No active session. Start one here to run scenarios:</p>
           <form id="whatif-start-form" class="stack">
             <label>
               <span data-i18n="whatif.scopeLabel">Scope</span>
               <select id="whatif-scope">
-                <option value="both" data-i18n="home.scopeBoth">Federal and state</option>
                 <option value="federal" data-i18n="home.scopeFederal">Federal only</option>
                 <option value="state" data-i18n="home.scopeState">State only</option>
+                <option value="both" data-i18n="home.scopeBoth">Federal and state</option>
               </select>
             </label>
-            <label id="whatif-state-label">
+            <label id="whatif-state-label" style="display:none">
               <span data-i18n="whatif.stateLabel">State</span>
               <select id="whatif-state-code">
                 <option value="" data-i18n="home.chooseState">Choose a state</option>
@@ -51,6 +51,7 @@
               </div>
               <div id="whatif-categories" class="category-grid"></div>
             </fieldset>
+            <p id="whatif-form-error" class="field-message hidden" aria-live="polite"></p>
             <button type="submit" class="start-button" data-i18n="whatif.startSession">Start Session</button>
           </form>
         </div>

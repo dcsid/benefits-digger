@@ -107,11 +107,15 @@ async function runScenario(index) {
 scenarioPresetsNode.addEventListener("click", async (event) => {
   const button = event.target.closest("[data-scenario-index]");
   if (!button) return;
+  button.disabled = true;
+  setStatus("Running scenario…");
   try {
     await runScenario(button.dataset.scenarioIndex);
     setStatus(t("whatif.updated"));
   } catch (error) {
     setStatus(t("whatif.failed", { error: error.message }));
+  } finally {
+    button.disabled = false;
   }
 });
 
@@ -149,14 +153,32 @@ function renderWhatifCategories() {
     .join("");
 }
 
+const whatifFormError = document.querySelector("#whatif-form-error");
+
+function showFormError(msg) {
+  if (whatifFormError) {
+    whatifFormError.textContent = msg;
+    whatifFormError.classList.remove("hidden");
+  }
+}
+function clearFormError() {
+  if (whatifFormError) {
+    whatifFormError.textContent = "";
+    whatifFormError.classList.add("hidden");
+  }
+}
+
 whatifScope?.addEventListener("change", () => {
   if (whatifStateLabel) {
-    whatifStateLabel.style.display = whatifScope.value === "federal" ? "none" : "";
+    const needsState = whatifScope.value !== "federal";
+    whatifStateLabel.style.display = needsState ? "" : "none";
+    if (needsState) loadWhatifStates().catch(() => {});
   }
 });
 
 whatifStartForm?.addEventListener("submit", async (e) => {
   e.preventDefault();
+  clearFormError();
   const scope = whatifScope.value;
   const stateCode = whatifStateCode?.value || "";
   const categories = [...document.querySelectorAll('input[name="whatif-category"]:checked')].map(
@@ -164,12 +186,18 @@ whatifStartForm?.addEventListener("submit", async (e) => {
   );
 
   if (!categories.length) {
-    setStatus(t("home.selectCategory"));
+    showFormError(t("home.selectCategory"));
     return;
   }
   if (scope !== "federal" && !stateCode) {
-    setStatus(t("home.chooseStateMsg"));
+    showFormError(t("home.chooseStateMsg"));
     return;
+  }
+
+  const submitBtn = whatifStartForm.querySelector('button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Creating session…";
   }
 
   try {
@@ -187,7 +215,11 @@ whatifStartForm?.addEventListener("submit", async (e) => {
     noSession.classList.add("hidden");
     setStatus(t("whatif.updated"));
   } catch (err) {
-    setStatus(t("whatif.failed", { error: err.message }));
+    showFormError(err.message || t("whatif.failed", { error: err.message }));
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = t("whatif.startSession");
+    }
   }
 });
 
