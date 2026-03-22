@@ -92,29 +92,44 @@
                 <button type="button" id="life-intake-apply" class="ghost" data-i18n="home.lifeApply">Apply these suggestions to the screener</button>
                 <button type="button" id="life-intake-start" data-i18n="home.lifeStart">Start screening from this intake</button>
               </div>
+              </div>
             </div>
-          </div>
+        </div>
+      </section>
 
-          <aside class="mini-panel intake-chat-panel">
+      <button
+        type="button"
+        id="life-chat-launcher"
+        class="life-chat-launcher hidden"
+        aria-controls="life-chat-popover"
+        aria-expanded="false"
+      >
+        <span class="life-chat-launcher-core">AI</span>
+      </button>
+
+      <section id="life-chat-popover" class="life-chat-popover hidden" aria-live="polite">
+        <div class="row spread">
+          <div>
             <strong data-i18n="home.lifeChatTitle">Probe for more detail</strong>
             <p class="meta" data-i18n="home.lifeChatHint">
               After the first intake pass, this small chatbox asks one short follow-up at a time and updates the structured facts above.
             </p>
-            <div id="life-chat-empty" class="empty" data-i18n="home.lifeChatEmpty">Run the intake first to unlock the follow-up chat.</div>
-            <div id="life-chatbox" class="life-chatbox hidden">
-              <div id="life-chat-messages" class="life-chat-messages"></div>
-              <form id="life-chat-form" class="stack">
-                <input
-                  id="life-chat-input"
-                  type="text"
-                  data-i18n="home.lifeChatPlaceholder"
-                  data-i18n-attr="placeholder"
-                  placeholder="Type a short reply like “yes”, “I’m in New York”, or “I’m in school right now.”"
-                />
-                <button type="submit" id="life-chat-send" data-i18n="home.lifeChatSend">Send follow-up</button>
-              </form>
-            </div>
-          </aside>
+          </div>
+          <button type="button" id="life-chat-close" class="ghost life-chat-close" aria-label="Close">×</button>
+        </div>
+        <div id="life-chat-empty" class="empty" data-i18n="home.lifeChatEmpty">Run the intake first to unlock the follow-up chat.</div>
+        <div id="life-chatbox" class="life-chatbox hidden">
+          <div id="life-chat-messages" class="life-chat-messages"></div>
+          <form id="life-chat-form" class="stack">
+            <input
+              id="life-chat-input"
+              type="text"
+              data-i18n="home.lifeChatPlaceholder"
+              data-i18n-attr="placeholder"
+              placeholder="Type a short reply like “yes”, “I’m in New York”, or “I’m in school right now.”"
+            />
+            <button type="submit" id="life-chat-send" data-i18n="home.lifeChatSend">Send follow-up</button>
+          </form>
         </div>
       </section>
 

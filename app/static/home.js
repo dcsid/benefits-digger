@@ -27,6 +27,9 @@ const lifeIntakeFacts = document.querySelector("#life-intake-facts");
 const lifeIntakeMissing = document.querySelector("#life-intake-missing");
 const lifeIntakeApplyButton = document.querySelector("#life-intake-apply");
 const lifeIntakeStartButton = document.querySelector("#life-intake-start");
+const lifeChatLauncher = document.querySelector("#life-chat-launcher");
+const lifeChatPopover = document.querySelector("#life-chat-popover");
+const lifeChatCloseButton = document.querySelector("#life-chat-close");
 const lifeChatEmpty = document.querySelector("#life-chat-empty");
 const lifeChatbox = document.querySelector("#life-chatbox");
 const lifeChatMessages = document.querySelector("#life-chat-messages");
@@ -38,6 +41,8 @@ const intakeState = {
   payload: null,
   messages: [],
   pendingQuestionKey: null,
+  chatOpen: false,
+  autoOpenedProbeKey: null,
 };
 
 function saveAdminKeyFromInput() {
@@ -221,15 +226,32 @@ function factLabel(fact) {
 function resetLifeChat() {
   intakeState.messages = [];
   intakeState.pendingQuestionKey = null;
+  intakeState.autoOpenedProbeKey = null;
   if (lifeChatMessages) lifeChatMessages.innerHTML = "";
 }
 
+function setLifeChatOpen(open, { focusInput = false } = {}) {
+  intakeState.chatOpen = Boolean(open) && Boolean(intakeState.payload);
+  if (lifeChatPopover) lifeChatPopover.classList.toggle("hidden", !intakeState.chatOpen);
+  if (lifeChatLauncher) {
+    lifeChatLauncher.setAttribute("aria-expanded", intakeState.chatOpen ? "true" : "false");
+  }
+  if (focusInput && intakeState.chatOpen && lifeChatInput) {
+    requestAnimationFrame(() => lifeChatInput.focus());
+  }
+}
+
 function renderLifeChat() {
-  if (!lifeChatbox || !lifeChatEmpty || !lifeChatMessages) return;
+  if (!lifeChatbox || !lifeChatEmpty || !lifeChatMessages || !lifeChatLauncher) return;
   const hasPayload = Boolean(intakeState.payload);
+  lifeChatLauncher.classList.toggle("hidden", !hasPayload);
+  lifeChatLauncher.classList.toggle("has-probe", Boolean(intakeState.payload?.next_probe));
   lifeChatEmpty.classList.toggle("hidden", hasPayload);
   lifeChatbox.classList.toggle("hidden", !hasPayload);
-  if (!hasPayload) return;
+  if (!hasPayload) {
+    setLifeChatOpen(false);
+    return;
+  }
 
   lifeChatMessages.innerHTML = intakeState.messages
     .map((message) => {
@@ -238,6 +260,12 @@ function renderLifeChat() {
     })
     .join("");
   lifeChatMessages.scrollTop = lifeChatMessages.scrollHeight;
+
+  const probeKey = intakeState.payload?.next_probe?.key || null;
+  if (probeKey && intakeState.autoOpenedProbeKey !== probeKey) {
+    intakeState.autoOpenedProbeKey = probeKey;
+    setLifeChatOpen(true, { focusInput: true });
+  }
 }
 
 function renderLifeIntake(payload) {
@@ -284,6 +312,7 @@ function clearLifeIntake() {
   intakeState.description = "";
   intakeState.payload = null;
   intakeState.pendingQuestionKey = null;
+  intakeState.chatOpen = false;
   lifeIntakeDescription.value = "";
   lifeChatInput.value = "";
   setLifeIntakeStatus("");
@@ -426,7 +455,7 @@ async function sendLifeProbe(message) {
         use_llm: true,
       }),
     });
-    if (payload.chat_reply) {
+  if (payload.chat_reply) {
       intakeState.messages.push({ role: "assistant", content: payload.chat_reply });
     }
     renderLifeIntake(payload);
@@ -521,6 +550,14 @@ lifeIntakeStartButton?.addEventListener("click", async () => {
 lifeChatForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   await sendLifeProbe(lifeChatInput.value || "");
+});
+
+lifeChatLauncher?.addEventListener("click", () => {
+  setLifeChatOpen(!intakeState.chatOpen, { focusInput: !intakeState.chatOpen });
+});
+
+lifeChatCloseButton?.addEventListener("click", () => {
+  setLifeChatOpen(false);
 });
 
 document.querySelector("#show-results").addEventListener("click", () => {
