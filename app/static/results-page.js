@@ -4,6 +4,17 @@ const stateResults = document.querySelector("#state-results");
 const stateResultsColumn = document.querySelector("#state-results-column");
 const resultsGrid = document.querySelector("#results-grid");
 const noSession = document.querySelector("#no-session");
+const redoScreeningButton = document.querySelector("#redo-screening");
+
+function redoScreening() {
+  setSessionId(null);
+  setActiveScope(null);
+  state.currentQuestion = null;
+  state.isScreeningFinished = false;
+  state.latestPlan = null;
+  state.latestResults = null;
+  window.location.href = "/?redo=1";
+}
 
 function updateResultsLayout() {
   const federalOnly = isFederalOnlyScope();
@@ -79,6 +90,8 @@ document.querySelector("#download-pdf").addEventListener("click", () => {
       btn.disabled = false;
     });
 });
+
+  redoScreeningButton?.addEventListener("click", redoScreening);
 
 /* ── Document checklist persistence ─────────────────────────── */
 

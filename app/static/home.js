@@ -2,6 +2,10 @@ const scopeSelect = document.querySelector("#scope");
 const stateSelect = document.querySelector("#state-code");
 const stateValidation = document.querySelector("#state-validation");
 const startScreeningPanel = document.querySelector("#start-screening-panel");
+const setupView = document.querySelector("#setup-view");
+const questionView = document.querySelector("#question-view");
+const sessionSummary = document.querySelector("#session-summary");
+const editSetupButton = document.querySelector("#edit-setup");
 const depthSlider = document.querySelector("#depth-slider");
 const depthPills = [...document.querySelectorAll(".depth-pill")];
 const depthDescription = document.querySelector("#depth-description");
@@ -9,11 +13,59 @@ const startForm = document.querySelector("#start-form");
 const questionForm = document.querySelector("#question-form");
 const questionShell = document.querySelector("#question-shell");
 const questionEmpty = document.querySelector("#question-empty");
+const questionCompleteActions = document.querySelector("#question-complete-actions");
+const backQuestionButton = document.querySelector("#back-question");
+const backQuestionCompleteButton = document.querySelector("#back-question-complete");
 const categoryList = document.querySelector("#category-list");
-const reviewTasksNode = document.querySelector("#review-tasks");
-const adminKeyInput = document.querySelector("#admin-key");
-const saveAdminKeyButton = document.querySelector("#save-admin-key");
-const clearAdminKeyButton = document.querySelector("#clear-admin-key");
+
+let questionTrail = [];
+let questionCursor = -1;
+let answerMap = {};
+
+function syncBackButtons() {
+  const canGoBackInForm = !state.isScreeningFinished && questionCursor > 0;
+  const canGoBackFromComplete = state.isScreeningFinished && questionTrail.length > 0;
+  if (backQuestionButton) backQuestionButton.disabled = !canGoBackInForm;
+  if (backQuestionCompleteButton) backQuestionCompleteButton.disabled = !canGoBackFromComplete;
+}
+
+function restoreCurrentAnswer(question) {
+  if (!question) return;
+  const stored = answerMap[question.key];
+  if (stored === undefined || stored === null) return;
+
+  const radioNodes = [...questionShell.querySelectorAll('input[type="radio"][name="answer"]')];
+  if (radioNodes.length) {
+    radioNodes.forEach((input) => {
+      input.checked = `${input.value}` === `${stored}`;
+    });
+    return;
+  }
+
+  const field = questionShell.querySelector('[name="answer"]');
+  if (field) field.value = stored;
+}
+
+function pruneAnswersToTrail() {
+  const keep = new Set(questionTrail.map((question) => question.key));
+  Object.keys(answerMap).forEach((key) => {
+    if (!keep.has(key)) delete answerMap[key];
+  });
+}
+
+function goBackOneQuestion() {
+  if (!questionTrail.length) return;
+
+  if (state.isScreeningFinished) {
+    questionCursor = questionTrail.length - 1;
+    renderQuestion(questionTrail[questionCursor]);
+    return;
+  }
+
+  if (questionCursor <= 0) return;
+  questionCursor -= 1;
+  renderQuestion(questionTrail[questionCursor]);
+}
 
 function setStateValidation(message = "") {
   if (!stateValidation || !stateSelect) return;
@@ -88,14 +140,16 @@ function renderCategories() {
   const selected = new Set(selectedCategories());
   categoryList.innerHTML = categoryDefinitions
     .map(
-      (category) => `
+      (category) => {
+        const label = getCategoryLabel(category.value) || category.label;
+        return `
         <label class="category-option">
-          <input type="checkbox" name="category" value="${category.value}" />
+          <input type="checkbox" name="category" value="${category.value}" ${selected.has(category.value) ? "checked" : ""} />
           <span class="category-icon" aria-hidden="true">${category.icon || "•"}</span>
-          <span>${category.label}</span>
-
+          <span>${escapeHtml(label)}</span>
         </label>
-      `,
+      `;
+      },
     )
     .join("");
 }
@@ -113,11 +167,14 @@ function renderQuestion(question) {
     questionEmpty.textContent = t("home.noMoreQuestions");
     questionEmpty.classList.remove("hidden");
     questionForm.classList.add("hidden");
+    questionCompleteActions?.classList.remove("hidden");
+    syncBackButtons();
     return;
   }
 
   questionEmpty.classList.add("hidden");
   questionForm.classList.remove("hidden");
+  questionCompleteActions?.classList.add("hidden");
 
   const translatedPrompt = translateDynamicText(question.prompt);
   const translatedHintText = translateDynamicText(question.hint);
@@ -165,53 +222,30 @@ function renderQuestion(question) {
       </label>
     </div>
   `;
+  restoreCurrentAnswer(question);
+  syncBackButtons();
 }
 
-function renderReviewTasks(tasks) {
-  state.latestReviewTasks = tasks;
-  reviewTasksNode.classList.remove("empty");
-  reviewTasksNode.innerHTML = tasks.length
-    ? tasks
-        .map(
-          (task) => `
-          <article class="task">
-            <div class="row spread">
-              <strong>${escapeHtml(task.source_title || t("home.sourceLabel"))}</strong>
-              <span class="pill">${escapeHtml(translateEnum("reviewStatus", task.status, task.status))}</span>
-            </div>
-            <p class="meta">${escapeHtml(t("home.reviewTaskMeta", {
-              diffType: translateEnum("reviewDiff", task.diff_type, task.diff_type),
-              score: task.materiality_score,
-            }))}</p>
-            <p><a href="${escapeHtml(task.source_url)}" target="_blank" rel="noreferrer">${escapeHtml(task.source_url)}</a></p>
-          </article>
-        `,
-        )
-        .join("")
-    : t("home.noReviewTasks");
+function showQuestionView() {
+  setupView?.classList.add("hidden");
+  questionView?.classList.remove("hidden");
 }
 
-async function loadReviewTasks() {
-  try {
-    const tasks = await getJson("/api/v1/admin/review-tasks");
-    renderReviewTasks(tasks);
-  } catch (error) {
-    reviewTasksNode.classList.add("empty");
-    reviewTasksNode.textContent = error.message;
-    throw error;
-  }
+function showSetupView() {
+  questionView?.classList.add("hidden");
+  setupView?.classList.remove("hidden");
+  scrollToTopOf(startScreeningPanel);
 }
 
-function syncAdminKeyInput() {
-  if (!adminKeyInput) return;
-  adminKeyInput.value = getAdminKey();
-}
-
-function saveAdminKeyFromInput() {
-  if (!adminKeyInput) return;
-  setAdminKey(adminKeyInput.value);
-  adminKeyInput.value = getAdminKey();
-  setStatus(getAdminKey() ? t("home.adminSaved") : t("home.adminCleared"));
+function updateSessionSummary() {
+  if (!sessionSummary) return;
+  const scopeText = scopeSelect.options[scopeSelect.selectedIndex]?.textContent || "Federal and state";
+  const stateText = stateSelect.value
+    ? stateSelect.options[stateSelect.selectedIndex]?.textContent || stateSelect.value
+    : "No state filter";
+  const depthText = getDepthDescriptor(parseFloat(depthSlider.value)).label;
+  const categoryCount = selectedCategories().length;
+  sessionSummary.textContent = `Currently searching: ${scopeText} | ${stateText} | ${depthText} depth | ${categoryCount} categories.`;
 }
 
 function resetApp() {
@@ -220,6 +254,9 @@ function resetApp() {
   state.currentQuestion = null;
   state.latestPlan = null;
   state.isScreeningFinished = false;
+  questionTrail = [];
+  questionCursor = -1;
+  answerMap = {};
 
   scopeSelect.value = "both";
   stateSelect.value = "";
@@ -227,11 +264,15 @@ function resetApp() {
   setAllCategories(false);
   updateStateVisibility();
   updateDepthDescription();
+  updateSessionSummary();
 
   questionForm.classList.add("hidden");
   questionShell.innerHTML = "";
   questionEmpty.textContent = t("home.questionEmpty");
   questionEmpty.classList.remove("hidden");
+  questionCompleteActions?.classList.add("hidden");
+  syncBackButtons();
+  showSetupView();
 
   setStatus("");
 }
@@ -281,7 +322,12 @@ startForm.addEventListener("submit", async (event) => {
       body: JSON.stringify(payload),
     });
     setSessionId(session.session_id);
+    questionTrail = session.next_question ? [session.next_question] : [];
+    questionCursor = session.next_question ? 0 : -1;
+    answerMap = {};
     renderQuestion(session.next_question);
+    updateSessionSummary();
+    showQuestionView();
     setStatus(t("home.sessionLive", { sessionId: state.sessionId }));
   } catch (error) {
     setStatus(t("home.sessionError", { error: error.message }));
@@ -306,14 +352,25 @@ questionForm.addEventListener("submit", async (event) => {
   }
   try {
     if (submitBtn) setLoading(submitBtn, true);
+    const currentQuestion = questionTrail[questionCursor] || state.currentQuestion;
+    answerMap[currentQuestion.key] = value;
+
+    questionTrail = questionTrail.slice(0, questionCursor + 1);
+    pruneAnswersToTrail();
+
     const payload = await getJson(`/api/v1/sessions/${state.sessionId}/answers`, {
       method: "POST",
       body: JSON.stringify({
-        answers: {
-          [state.currentQuestion.key]: value,
-        },
+        answers: answerMap,
+        replace_answers: true,
       }),
     });
+
+    if (payload.next_question) {
+      questionTrail.push(payload.next_question);
+      questionCursor = questionTrail.length - 1;
+    }
+
     renderQuestion(payload.next_question);
     setStatus(t("home.answerSaved"));
   } catch (error) {
@@ -323,29 +380,27 @@ questionForm.addEventListener("submit", async (event) => {
   }
 });
 
-document.querySelector("#show-results").addEventListener("click", async () => {
+function goToResultsPage() {
+  window.location.href = "/results";
+}
+
+document.querySelector("#show-results")?.addEventListener("click", async () => {
   try {
-    setStatus(t("home.resultsRefreshed"));
+    goToResultsPage();
   } catch (error) {
     setStatus(t("results.loadError", { error: error.message }));
   }
 });
 
-document.querySelector("#sync-button").addEventListener("click", async () => {
+document.querySelector("#show-results-complete")?.addEventListener("click", async () => {
   try {
-    setStatus(t("home.refreshingOfficialSources"));
-    const payload = await getJson("/api/v1/admin/sync", { method: "POST" });
-    renderReviewTasks(payload.review_tasks || []);
-    setStatus(t("home.syncSummary", {
-      crawled: payload.crawled_programs || 0,
-      added: payload.crawl_sources_added || 0,
-    }));
+    goToResultsPage();
   } catch (error) {
-    setStatus(t("home.syncFailed", { error: error.message }));
+    setStatus(t("results.loadError", { error: error.message }));
   }
 });
-
-document.querySelector("#refresh-review").addEventListener("click", loadReviewTasks);
+backQuestionButton?.addEventListener("click", goBackOneQuestion);
+backQuestionCompleteButton?.addEventListener("click", goBackOneQuestion);
 document.querySelector("#select-all-categories").addEventListener("click", () => setAllCategories(true));
 document.querySelector("#clear-categories").addEventListener("click", () => setAllCategories(false));
 scopeSelect.addEventListener("change", updateStateVisibility);
@@ -361,24 +416,14 @@ depthPills.forEach((pill) => {
     updateDepthDescription();
   });
 });
-saveAdminKeyButton?.addEventListener("click", saveAdminKeyFromInput);
-clearAdminKeyButton?.addEventListener("click", () => {
-  if (!adminKeyInput) return;
-  adminKeyInput.value = "";
-  saveAdminKeyFromInput();
-});
-adminKeyInput?.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    saveAdminKeyFromInput();
-  }
-});
+editSetupButton?.addEventListener("click", showSetupView);
 
 document.querySelector("#reset-button").addEventListener("click", resetApp);
 
 document.addEventListener("localechange", () => {
   renderCategories();
   updateDepthDescription();
+  updateSessionSummary();
   loadStates().catch((error) => setStatus(error.message));
   if (state.currentQuestion) {
     renderQuestion(state.currentQuestion);
@@ -387,17 +432,20 @@ document.addEventListener("localechange", () => {
   } else {
     questionEmpty.textContent = t("home.questionEmpty");
   }
-  if (state.latestReviewTasks) {
-    renderReviewTasks(state.latestReviewTasks);
-  } else if (reviewTasksNode.classList.contains("empty")) {
-    reviewTasksNode.textContent = t("home.noReviewTasks");
-  }
 });
 
 renderCategories();
-syncAdminKeyInput();
-loadStates()
-  .then(() => loadReviewTasks())
-  .catch((error) => setStatus(error.message));
+loadStates().catch((error) => setStatus(error.message));
 updateStateVisibility();
 updateDepthDescription();
+updateSessionSummary();
+
+const params = new URLSearchParams(window.location.search);
+if (params.get("redo") === "1") {
+  resetApp();
+  params.delete("redo");
+  const query = params.toString();
+  window.history.replaceState({}, "", query ? `/?${query}` : "/");
+} else {
+  syncBackButtons();
+}

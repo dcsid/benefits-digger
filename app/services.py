@@ -695,7 +695,20 @@ def get_session_or_404(db: Session, public_id: str) -> ScreeningSession:
     return session
 
 
-def upsert_answers(db: Session, session: ScreeningSession, answers: dict[str, Any]) -> None:
+def upsert_answers(
+    db: Session,
+    session: ScreeningSession,
+    answers: dict[str, Any],
+    *,
+    replace_answers: bool = False,
+) -> None:
+    if replace_answers:
+        keep_keys = set(answers.keys())
+        existing_rows = db.scalars(select(SessionAnswer).where(SessionAnswer.session_id == session.id)).all()
+        for row in existing_rows:
+            if row.question_key not in keep_keys:
+                db.delete(row)
+
     for key, value in answers.items():
         variant = resolve_question_variant(db, key, session.depth_value)
         if variant and variant.normalizer:
@@ -729,7 +742,9 @@ def get_next_question(db: Session, session: ScreeningSession, answers: dict[str,
     if session.scope in {"state", "both"} and not session.state_code and "state_code" not in answers:
         return db.scalar(select(Question).where(Question.key == "state_code"))
 
-    if len(answers) >= policy["max_answers"]:
+    screening_answers_count = count_screening_answers(answers)
+
+    if screening_answers_count >= policy["max_answers"]:
         return None
 
     scores = score_unanswered_questions(db, session, answers, enforce_depth_unlocks=True)
@@ -1276,6 +1291,11 @@ def question_is_unlocked(question: Question, answers_count: int, policy: dict[st
     return answers_count >= unlock_after
 
 
+def count_screening_answers(answers: dict[str, Any]) -> int:
+    """Count user-provided screening answers, excluding implicit context fields."""
+    return sum(1 for key in answers if key != "state_code")
+
+
 def score_unanswered_questions(
     db: Session,
     session: ScreeningSession,
@@ -1286,7 +1306,7 @@ def score_unanswered_questions(
     policy = get_breadth_policy(session)
     scores: dict[str, float] = {}
     candidate_programs = get_candidate_programs(db, session)
-    answers_count = len(answers)
+    answers_count = count_screening_answers(answers)
     for program in candidate_programs:
         version = get_latest_version(db, program.id)
         if version is None:

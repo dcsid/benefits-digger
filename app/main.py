@@ -225,7 +225,7 @@ def answer_screening_question(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-    upsert_answers(db, session, payload.answers)
+    upsert_answers(db, session, payload.answers, replace_answers=payload.replace_answers)
     answers = get_answers_map(db, session)
     next_question = get_next_question(db, session, answers)
     return SessionEnvelope(
