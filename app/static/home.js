@@ -288,6 +288,10 @@ function setLifeChatOpen(open, { focusInput = false } = {}) {
   }
 }
 
+function closeLifeChat() {
+  setLifeChatOpen(false);
+}
+
 function renderLifeChat() {
   if (!lifeChatbox || !lifeChatEmpty || !lifeChatMessages || !lifeChatLauncher) return;
   const hasPayload = Boolean(intakeState.payload);
@@ -688,14 +692,32 @@ lifeChatLauncher?.addEventListener("click", () => {
   setLifeChatOpen(!intakeState.chatOpen, { focusInput: !intakeState.chatOpen });
 });
 
-lifeChatCloseButton?.addEventListener("click", () => {
-  setLifeChatOpen(false);
+lifeChatCloseButton?.addEventListener("click", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  closeLifeChat();
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && intakeState.chatOpen) {
-    setLifeChatOpen(false);
+    closeLifeChat();
   }
+});
+
+lifeChatPopover?.addEventListener("click", (event) => {
+  const closeTarget = event.target.closest("#life-chat-close");
+  if (closeTarget) {
+    event.preventDefault();
+    closeLifeChat();
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (!intakeState.chatOpen) return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (target.closest("#life-chat-popover") || target.closest("#life-chat-launcher")) return;
+  closeLifeChat();
 });
 
 document.querySelector("#show-results").addEventListener("click", () => {

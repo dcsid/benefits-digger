@@ -558,10 +558,23 @@ fieldset {
   display: flex;
   gap: 0.8rem;
   align-items: flex-start;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .life-chat-header-copy {
   gap: 0.2rem;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.life-chat-header-copy strong,
+.life-chat-header-copy .meta {
+  margin: 0;
+}
+
+.life-chat-header-copy strong {
+  line-height: 1.15;
 }
 
 .life-chat-avatar {
@@ -605,6 +618,7 @@ fieldset {
   height: 28px;
   align-items: center;
   justify-content: center;
+  line-height: 1;
 }
 
 .life-chat-bot-icon::before {
@@ -685,6 +699,7 @@ fieldset {
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 600;
+  line-height: 1;
 }
 
 .chat-avatar {
@@ -696,6 +711,13 @@ fieldset {
   justify-content: center;
   font-size: 0.66rem;
   letter-spacing: 0.04em;
+  line-height: 1;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.chat-author {
+  line-height: 1.2;
 }
 
 .chat-avatar.assistant {
@@ -757,6 +779,7 @@ fieldset {
 }
 
 .life-chat-suggestions-label {
+  flex-basis: 100%;
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 600;
@@ -787,6 +810,7 @@ fieldset {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.48);
   box-shadow: 0 10px 30px rgba(11, 110, 79, 0.25);
+  line-height: 1;
 }
 
 .life-chat-launcher-core {
@@ -801,6 +825,7 @@ fieldset {
   font-weight: 700;
   letter-spacing: 0.04em;
   position: relative;
+  line-height: 1;
 }
 
 .life-chat-launcher.has-probe {
@@ -836,6 +861,7 @@ fieldset {
   box-shadow: 0 20px 48px rgba(31, 42, 36, 0.18);
   transform-origin: bottom right;
   animation: chat-pop 0.18s ease-out;
+  align-content: start;
 }
 
 .life-chat-close {
@@ -845,6 +871,12 @@ fieldset {
   border-radius: 999px;
   line-height: 1;
   font-size: 1.2rem;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
 }
 
 @keyframes bot-pulse {
