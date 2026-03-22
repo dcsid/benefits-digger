@@ -728,22 +728,6 @@ function getZoboPlaceholder(zoboState) {
   return t("home.lifeChatPlaceholder");
 }
 
-function buildZoboSuggestions(zoboState) {
-  const probe = zoboState.payload?.next_probe;
-  if (!probe || zoboState.isProbeLoading) return [];
-  if (probe.input_type === "yes_no" && Array.isArray(probe.options)) {
-    return probe.options.map((option) => ({
-      value: option.value,
-      label: translateDynamicText(option.label),
-    }));
-  }
-  if (probe.input_type === "state") {
-    const knownState = getZoboStateCodeFromContext(zoboState);
-    return knownState ? [{ value: knownState, label: knownState }] : [];
-  }
-  return [];
-}
-
 function normalizeZoboNavigationAction(action) {
   if (!action || !action.href) return null;
   if (action.href === "#start-screening-panel" || action.href === "action:start_screening") {
@@ -762,7 +746,6 @@ function ensureSitewideZoboMarkup() {
       header: document.querySelector("#sitewide-zobo-popover .life-chat-header"),
       closeButton: document.querySelector("#sitewide-zobo-close"),
       messages: document.querySelector("#sitewide-zobo-messages"),
-      suggestions: document.querySelector("#sitewide-zobo-suggestions"),
       actions: document.querySelector("#sitewide-zobo-actions"),
       form: document.querySelector("#sitewide-zobo-form"),
       input: document.querySelector("#sitewide-zobo-input"),
@@ -816,7 +799,6 @@ function ensureSitewideZoboMarkup() {
         </div>
         <div class="life-chatbox">
           <div id="sitewide-zobo-messages" class="life-chat-messages"></div>
-          <div id="sitewide-zobo-suggestions" class="life-chat-suggestions hidden"></div>
           <div id="sitewide-zobo-actions" class="life-chat-actions hidden"></div>
           <form id="sitewide-zobo-form" class="life-chat-form">
             <label class="sr-only" for="sitewide-zobo-input">${escapeHtml(t("home.lifeChatInputLabel"))}</label>
@@ -888,28 +870,6 @@ function renderSitewideZobo(zoboState) {
     `;
   }
   nodes.messages.scrollTop = nodes.messages.scrollHeight;
-
-  const suggestions = buildZoboSuggestions(zoboState);
-  if (suggestions.length) {
-    nodes.suggestions.classList.remove("hidden");
-    nodes.suggestions.innerHTML = `
-      <span class="life-chat-suggestions-label">${escapeHtml(t("home.lifeChatQuickReplies"))}</span>
-      ${suggestions
-        .map(
-          (suggestion) => `
-            <button
-              type="button"
-              class="life-chat-suggestion"
-              data-sitewide-zobo-suggestion="${escapeHtml(suggestion.value)}"
-            >${escapeHtml(suggestion.label)}</button>
-          `,
-        )
-        .join("")}
-    `;
-  } else {
-    nodes.suggestions.classList.add("hidden");
-    nodes.suggestions.innerHTML = "";
-  }
 
   const actions = (zoboState.payload?.navigation_actions || [])
     .map(normalizeZoboNavigationAction)
@@ -1050,12 +1010,6 @@ function initializeSitewideZobo() {
     event.preventDefault();
     if (zoboState.isProbeLoading) return;
     await probe(nodes.input.value || "");
-  });
-
-  nodes.suggestions.addEventListener("click", async (event) => {
-    const target = event.target.closest("[data-sitewide-zobo-suggestion]");
-    if (!target || zoboState.isProbeLoading) return;
-    await probe(target.dataset.sitewideZoboSuggestion || "");
   });
 
   nodes.launcher.addEventListener("click", () => {

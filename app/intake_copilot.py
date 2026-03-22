@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
-from app.gemini import INTAKE_NAVIGATION_ACTIONS, generate_intake_assistant_guidance
+from app.gemini import INTAKE_NAVIGATION_ACTIONS, STATE_NAMES, generate_intake_assistant_guidance
 from app.hybrid_explorer import interpret_hybrid_explorer_request
 from app.services import CATEGORY_LABELS
 
@@ -264,6 +264,25 @@ def _collect_story_text(description: str, messages: list[dict[str, str]]) -> str
     return " ".join(part for part in parts if part).strip()
 
 
+def _resolve_state_code_from_message(message: str) -> Optional[str]:
+    normalized = _normalize_text(message)
+    if not normalized:
+        return None
+
+    collapsed = re.sub(r"[^a-z]", "", normalized)
+    if len(collapsed) == 2:
+        candidate = collapsed.upper()
+        if candidate in STATE_NAMES:
+            return candidate
+
+    for code, name in STATE_NAMES.items():
+        normalized_name = _normalize_text(name)
+        collapsed_name = re.sub(r"[^a-z]", "", normalized_name)
+        if normalized == normalized_name or collapsed == collapsed_name:
+            return code
+    return None
+
+
 def _is_low_signal_opening(text: str, categories: list[str], facts: dict[str, Any]) -> bool:
     normalized = _normalize_text(text)
     if not normalized:
@@ -341,6 +360,10 @@ def _parse_probe_answer(db: Session, question_key: str, message: str) -> dict[st
     updates: dict[str, Any] = {}
 
     if question_key == "state_code":
+        resolved_state_code = _resolve_state_code_from_message(message)
+        if resolved_state_code:
+            updates["state_code"] = resolved_state_code
+            return updates
         interpretation = interpret_hybrid_explorer_request(
             db,
             description=message,

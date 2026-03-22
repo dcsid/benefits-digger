@@ -829,6 +829,45 @@ def test_life_event_probe_updates_state_and_prefill_answers() -> None:
         assert probe_payload["current_facts"]["state_code"] == "NY"
 
 
+def test_life_event_probe_accepts_state_code_quick_reply_without_repeating_state_prompt() -> None:
+    with TestClient(app) as client:
+        initial = client.post(
+            "/api/v1/intake/interpret",
+            json={
+                "description": "I lost my job and I am behind on rent.",
+                "use_llm": False,
+            },
+        )
+        assert initial.status_code == 200
+        first_payload = initial.json()
+        assert first_payload["next_probe"] is not None
+        assert first_payload["next_probe"]["key"] == "state_code"
+
+        probe = client.post(
+            "/api/v1/intake/probe",
+            json={
+                "description": "I lost my job and I am behind on rent.",
+                "scope": first_payload["suggested_scope"],
+                "state_code": first_payload["applied_state_code"],
+                "categories": [item["key"] for item in first_payload["suggested_categories"]],
+                "current_facts": first_payload["current_facts"],
+                "pending_question_key": "state_code",
+                "messages": [
+                    {"role": "user", "content": "I lost my job and I am behind on rent."},
+                    {"role": "assistant", "content": first_payload["chat_reply"]},
+                    {"role": "user", "content": "CA"},
+                ],
+                "use_llm": False,
+            },
+        )
+
+        assert probe.status_code == 200
+        payload = probe.json()
+        assert payload["applied_state_code"] == "CA"
+        assert payload["current_facts"]["state_code"] == "CA"
+        assert payload["next_probe"] is None or payload["next_probe"]["key"] != "state_code"
+
+
 def test_life_event_probe_can_reach_conclusion_after_key_follow_up() -> None:
     with TestClient(app) as client:
         initial = client.post(

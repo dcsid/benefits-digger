@@ -23,7 +23,6 @@ const lifeChatHeader = document.querySelector(".life-chat-header");
 const lifeChatCloseButton = document.querySelector("#life-chat-close");
 const lifeChatbox = document.querySelector("#life-chatbox");
 const lifeChatMessages = document.querySelector("#life-chat-messages");
-const lifeChatSuggestions = document.querySelector("#life-chat-suggestions");
 const lifeChatForm = document.querySelector("#life-chat-form");
 const lifeChatInput = document.querySelector("#life-chat-input");
 const lifeChatSendButton = document.querySelector("#life-chat-send");
@@ -318,29 +317,6 @@ function getLifeChatPlaceholder() {
   return t("home.lifeChatPlaceholder");
 }
 
-function buildLifeChatSuggestions() {
-  const probe = intakeState.payload?.next_probe;
-  if (!probe || intakeState.isProbeLoading) return [];
-
-  if (probe.input_type === "yes_no" && Array.isArray(probe.options)) {
-    return probe.options.map((option) => ({
-      value: option.value,
-      label: translateDynamicText(option.label),
-    }));
-  }
-
-  if (probe.input_type === "state") {
-    const suggestions = [];
-    const knownState = intakeState.payload?.applied_state_code || stateSelect?.value || "";
-    if (knownState) {
-      suggestions.push({ value: knownState, label: knownState });
-    }
-    return suggestions;
-  }
-
-  return [];
-}
-
 function syncLifePayloadToForm() {
   if (!intakeState.payload) return;
   scopeSelect.value = intakeState.payload.suggested_scope || "federal";
@@ -435,30 +411,6 @@ function renderLifeChat() {
     `;
   }
   lifeChatMessages.scrollTop = lifeChatMessages.scrollHeight;
-
-  const suggestions = buildLifeChatSuggestions();
-  if (lifeChatSuggestions) {
-    if (suggestions.length) {
-      lifeChatSuggestions.classList.remove("hidden");
-      lifeChatSuggestions.innerHTML = `
-        <span class="life-chat-suggestions-label">${escapeHtml(t("home.lifeChatQuickReplies"))}</span>
-        ${suggestions
-          .map(
-            (suggestion) => `
-              <button
-                type="button"
-                class="life-chat-suggestion"
-                data-life-chat-suggestion="${escapeHtml(suggestion.value)}"
-              >${escapeHtml(suggestion.label)}</button>
-            `,
-          )
-          .join("")}
-      `;
-    } else {
-      lifeChatSuggestions.classList.add("hidden");
-      lifeChatSuggestions.innerHTML = "";
-    }
-  }
 
   if (lifeChatInput) {
     lifeChatInput.placeholder = getLifeChatPlaceholder();
@@ -759,12 +711,6 @@ lifeChatForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (intakeState.isProbeLoading) return;
   await sendLifeProbe(lifeChatInput.value || "");
-});
-
-lifeChatSuggestions?.addEventListener("click", async (event) => {
-  const target = event.target.closest("[data-life-chat-suggestion]");
-  if (!target || intakeState.isProbeLoading) return;
-  await sendLifeProbe(target.dataset.lifeChatSuggestion || "");
 });
 
 lifeChatLauncher?.addEventListener("click", () => {
