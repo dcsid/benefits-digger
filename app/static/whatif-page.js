@@ -115,9 +115,95 @@ scenarioPresetsNode.addEventListener("click", async (event) => {
   }
 });
 
+/* ── Quick-start session form ── */
+
+const whatifStartForm = document.querySelector("#whatif-start-form");
+const whatifScope = document.querySelector("#whatif-scope");
+const whatifStateLabel = document.querySelector("#whatif-state-label");
+const whatifStateCode = document.querySelector("#whatif-state-code");
+const whatifCategoriesContainer = document.querySelector("#whatif-categories");
+
+async function loadWhatifStates() {
+  if (!whatifStateCode) return;
+  const states = await getJson("/api/v1/jurisdictions/states");
+  whatifStateCode.innerHTML = `<option value="">${escapeHtml(t("home.chooseState"))}</option>`;
+  states.forEach((item) => {
+    const opt = document.createElement("option");
+    opt.value = item.code;
+    opt.textContent = `${item.name} (${item.code})`;
+    whatifStateCode.appendChild(opt);
+  });
+}
+
+function renderWhatifCategories() {
+  if (!whatifCategoriesContainer) return;
+  whatifCategoriesContainer.innerHTML = categoryDefinitions
+    .map(
+      (cat) => `
+      <label class="category-option">
+        <input type="checkbox" name="whatif-category" value="${cat.value}" checked />
+        <span class="category-icon">${cat.icon || ""}</span>
+        <span>${escapeHtml(getCategoryLabel(cat.value) || cat.label)}</span>
+      </label>`,
+    )
+    .join("");
+}
+
+whatifScope?.addEventListener("change", () => {
+  if (whatifStateLabel) {
+    whatifStateLabel.style.display = whatifScope.value === "federal" ? "none" : "";
+  }
+});
+
+whatifStartForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const scope = whatifScope.value;
+  const stateCode = whatifStateCode?.value || "";
+  const categories = [...document.querySelectorAll('input[name="whatif-category"]:checked')].map(
+    (cb) => cb.value,
+  );
+
+  if (!categories.length) {
+    setStatus(t("home.selectCategory"));
+    return;
+  }
+  if (scope !== "federal" && !stateCode) {
+    setStatus(t("home.chooseStateMsg"));
+    return;
+  }
+
+  try {
+    const session = await getJson("/api/v1/sessions", {
+      method: "POST",
+      body: JSON.stringify({
+        scope,
+        state_code: stateCode || null,
+        categories,
+        depth_value: 0.5,
+      }),
+    });
+    setSessionId(session.session_id);
+    setActiveScope(scope);
+    noSession.classList.add("hidden");
+    setStatus(t("whatif.updated"));
+  } catch (err) {
+    setStatus(t("whatif.failed", { error: err.message }));
+  }
+});
+
+document.querySelector("#whatif-select-all")?.addEventListener("click", () => {
+  document.querySelectorAll('input[name="whatif-category"]').forEach((cb) => (cb.checked = true));
+});
+document.querySelector("#whatif-clear-all")?.addEventListener("click", () => {
+  document.querySelectorAll('input[name="whatif-category"]').forEach((cb) => (cb.checked = false));
+});
+
+/* ── Initialization ── */
+
 if (!state.sessionId) {
   noSession.classList.remove("hidden");
-  noSession.innerHTML = `<p>${t("whatif.noSession")}</p>`;
+  loadWhatifStates().catch((err) => setStatus(err.message));
+  renderWhatifCategories();
 }
 renderScenarioPresets();
 
@@ -129,6 +215,7 @@ document.addEventListener("localechange", () => {
     scenarioResults.textContent = t("whatif.startThenRun");
   }
   if (!state.sessionId) {
-    noSession.innerHTML = `<p>${t("whatif.noSession")}</p>`;
+    renderWhatifCategories();
+    loadWhatifStates().catch((err) => setStatus(err.message));
   }
 });

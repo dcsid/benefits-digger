@@ -27,7 +27,32 @@
         </div>
         <p id="status" class="status"></p>
         <div id="no-session" class="empty empty-cta hidden">
-          <p data-i18n="whatif.noSession">No active session. <a href="/">Start a screening</a> first.</p>
+          <p data-i18n="whatif.quickStartIntro">No active session. Start one here to run scenarios:</p>
+          <form id="whatif-start-form" class="stack">
+            <label>
+              <span data-i18n="whatif.scopeLabel">Scope</span>
+              <select id="whatif-scope">
+                <option value="both" data-i18n="home.scopeBoth">Federal and state</option>
+                <option value="federal" data-i18n="home.scopeFederal">Federal only</option>
+                <option value="state" data-i18n="home.scopeState">State only</option>
+              </select>
+            </label>
+            <label id="whatif-state-label">
+              <span data-i18n="whatif.stateLabel">State</span>
+              <select id="whatif-state-code">
+                <option value="" data-i18n="home.chooseState">Choose a state</option>
+              </select>
+            </label>
+            <fieldset class="category-picker">
+              <legend data-i18n="whatif.categoriesLabel">Benefit categories</legend>
+              <div class="row">
+                <button type="button" id="whatif-select-all" class="ghost" data-i18n="home.selectAll">Select all</button>
+                <button type="button" id="whatif-clear-all" class="ghost" data-i18n="home.clear">Clear</button>
+              </div>
+              <div id="whatif-categories" class="category-grid"></div>
+            </fieldset>
+            <button type="submit" class="start-button" data-i18n="whatif.startSession">Start Session</button>
+          </form>
         </div>
         <div class="dashboard-card-container">
           <p class="meta" data-i18n="whatif.description">
