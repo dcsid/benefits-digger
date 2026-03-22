@@ -11,10 +11,10 @@ const questionForm = document.querySelector("#question-form");
 const questionShell = document.querySelector("#question-shell");
 const questionEmpty = document.querySelector("#question-empty");
 const categoryList = document.querySelector("#category-list");
-const reviewTasksNode = document.querySelector("#review-tasks");
-const adminKeyInput = document.querySelector("#admin-key");
-const saveAdminKeyButton = document.querySelector("#save-admin-key");
-const clearAdminKeyButton = document.querySelector("#clear-admin-key");
+// const reviewTasksNode = document.querySelector("#review-tasks");
+// const adminKeyInput = document.querySelector("#admin-key");
+// const saveAdminKeyButton = document.querySelector("#save-admin-key");
+// const clearAdminKeyButton = document.querySelector("#clear-admin-key");
 
 function setStateValidation(message = "") {
   if (!stateValidation || !stateSelect) return;
@@ -91,7 +91,7 @@ function setAllCategories(checked) {
 
 function renderQuestion(question) {
   state.currentQuestion = question;
-  state.isScreeningFinished = !question;
+  setScreeningFinished(!question);
   if (!question) {
     questionEmpty.textContent = t("home.noMoreQuestions");
     questionEmpty.classList.remove("hidden");
@@ -149,6 +149,7 @@ function renderQuestion(question) {
   `;
 }
 
+/* -- Review Queue – commented out for now --
 function renderReviewTasks(tasks) {
   state.latestReviewTasks = tasks;
   reviewTasksNode.classList.remove("empty");
@@ -183,25 +184,14 @@ async function loadReviewTasks() {
     throw error;
   }
 }
-
-function syncAdminKeyInput() {
-  if (!adminKeyInput) return;
-  adminKeyInput.value = getAdminKey();
-}
-
-function saveAdminKeyFromInput() {
-  if (!adminKeyInput) return;
-  setAdminKey(adminKeyInput.value);
-  adminKeyInput.value = getAdminKey();
-  setStatus(getAdminKey() ? t("home.adminSaved") : t("home.adminCleared"));
-}
+-- end Review Queue */
 
 function resetApp() {
   setSessionId(null);
   setActiveScope(null);
   state.currentQuestion = null;
   state.latestPlan = null;
-  state.isScreeningFinished = false;
+  setScreeningFinished(false);
 
   scopeSelect.value = "both";
   stateSelect.value = "";
@@ -308,29 +298,10 @@ questionForm.addEventListener("submit", async (event) => {
   }
 });
 
-document.querySelector("#show-results").addEventListener("click", async () => {
-  try {
-    setStatus(t("home.resultsRefreshed"));
-  } catch (error) {
-    setStatus(t("results.loadError", { error: error.message }));
-  }
+document.querySelector("#show-results").addEventListener("click", () => {
+  window.location.href = "/results";
 });
 
-document.querySelector("#sync-button").addEventListener("click", async () => {
-  try {
-    setStatus(t("home.refreshingOfficialSources"));
-    const payload = await getJson("/api/v1/admin/sync", { method: "POST" });
-    renderReviewTasks(payload.review_tasks || []);
-    setStatus(t("home.syncSummary", {
-      crawled: payload.crawled_programs || 0,
-      added: payload.crawl_sources_added || 0,
-    }));
-  } catch (error) {
-    setStatus(t("home.syncFailed", { error: error.message }));
-  }
-});
-
-document.querySelector("#refresh-review").addEventListener("click", loadReviewTasks);
 document.querySelector("#select-all-categories").addEventListener("click", () => setAllCategories(true));
 document.querySelector("#clear-categories").addEventListener("click", () => setAllCategories(false));
 scopeSelect.addEventListener("change", updateStateVisibility);
@@ -339,18 +310,6 @@ stateSelect.addEventListener("change", () => {
 });
 breadthSlider.addEventListener("input", updateBreadthDescription);
 depthSlider.addEventListener("input", updateDepthDescription);
-saveAdminKeyButton?.addEventListener("click", saveAdminKeyFromInput);
-clearAdminKeyButton?.addEventListener("click", () => {
-  if (!adminKeyInput) return;
-  adminKeyInput.value = "";
-  saveAdminKeyFromInput();
-});
-adminKeyInput?.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    saveAdminKeyFromInput();
-  }
-});
 
 document.querySelector("#reset-button").addEventListener("click", resetApp);
 
@@ -366,17 +325,17 @@ document.addEventListener("localechange", () => {
   } else {
     questionEmpty.textContent = t("home.questionEmpty");
   }
+  /* -- Review Queue locale update commented out --
   if (state.latestReviewTasks) {
     renderReviewTasks(state.latestReviewTasks);
   } else if (reviewTasksNode.classList.contains("empty")) {
     reviewTasksNode.textContent = t("home.noReviewTasks");
   }
+  */
 });
 
 renderCategories();
-syncAdminKeyInput();
 loadStates()
-  .then(() => loadReviewTasks())
   .catch((error) => setStatus(error.message));
 updateStateVisibility();
 updateBreadthDescription();

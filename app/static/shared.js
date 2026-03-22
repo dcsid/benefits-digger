@@ -8,7 +8,7 @@ const state = {
   latestReviewTasks: null,
   activeScope: localStorage.getItem("bd_active_scope") || null,
   adminKey: sessionStorage.getItem("bd_admin_key") || "",
-  isScreeningFinished: false,
+  isScreeningFinished: localStorage.getItem("bd_screening_finished") === "1",
 };
 
 /* ── i18n translation system ─────────────────────────────────── */
@@ -83,6 +83,20 @@ function setAdminKey(key) {
   state.adminKey = normalized;
   if (normalized) sessionStorage.setItem("bd_admin_key", normalized);
   else sessionStorage.removeItem("bd_admin_key");
+}
+
+function setScreeningFinished(finished) {
+  state.isScreeningFinished = finished;
+  if (finished) localStorage.setItem("bd_screening_finished", "1");
+  else localStorage.removeItem("bd_screening_finished");
+  updateResultsNavVisibility();
+}
+
+function updateResultsNavVisibility() {
+  const navResults = document.querySelector("#nav-results");
+  if (!navResults) return;
+  if (state.isScreeningFinished) navResults.classList.remove("hidden");
+  else navResults.classList.add("hidden");
 }
 
 const categoryDefinitions = [
@@ -533,3 +547,6 @@ function renderResultCard(item) {
     </article>
   `;
 }
+
+// Show/hide Results nav link based on screening state on every page load
+updateResultsNavVisibility();
