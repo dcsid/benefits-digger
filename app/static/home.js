@@ -136,6 +136,33 @@ function estimateDepthQuestionCount(depthValue) {
   return Math.round(10 + (24 - 10) * t);
 }
 
+function updateButtonTextForState() {
+  const submitBtn = document.querySelector("#start-form button[type='submit']");
+  if (!submitBtn) return;
+  
+  const scope = scopeSelect.value;
+  const stateCode = stateSelect.value;
+  
+  let buttonText = "Start My Screening";
+  
+  // Try to get localized version
+  const localizedStart = t("home.startScreening");
+  if (localizedStart && !localizedStart.includes("home.")) {
+    buttonText = localizedStart;
+  }
+  
+  // If state is selected and not federal-only, personalize
+  if (stateCode && scope !== "federal") {
+    const stateOption = stateSelect.options[stateSelect.selectedIndex];
+    if (stateOption) {
+      const stateName = stateOption.textContent.split('(')[0].trim();
+      buttonText = `Find ${stateName} Benefits`;
+    }
+  }
+  
+  submitBtn.textContent = buttonText;
+}
+
 function renderCategories() {
   const selected = new Set(selectedCategories());
   categoryList.innerHTML = categoryDefinitions
@@ -264,6 +291,7 @@ function resetApp() {
   setAllCategories(false);
   updateStateVisibility();
   updateDepthDescription();
+  updateButtonTextForState();
   updateSessionSummary();
 
   questionForm.classList.add("hidden");
@@ -403,9 +431,13 @@ backQuestionButton?.addEventListener("click", goBackOneQuestion);
 backQuestionCompleteButton?.addEventListener("click", goBackOneQuestion);
 document.querySelector("#select-all-categories").addEventListener("click", () => setAllCategories(true));
 document.querySelector("#clear-categories").addEventListener("click", () => setAllCategories(false));
-scopeSelect.addEventListener("change", updateStateVisibility);
+scopeSelect.addEventListener("change", () => {
+  updateStateVisibility();
+  updateButtonTextForState();
+});
 stateSelect.addEventListener("change", () => {
   if (stateSelect.value) setStateValidation("");
+  updateButtonTextForState();
 });
 depthSlider.addEventListener("input", updateDepthDescription);
 depthPills.forEach((pill) => {
@@ -423,6 +455,7 @@ document.querySelector("#reset-button").addEventListener("click", resetApp);
 document.addEventListener("localechange", () => {
   renderCategories();
   updateDepthDescription();
+  updateButtonTextForState();
   updateSessionSummary();
   loadStates().catch((error) => setStatus(error.message));
   if (state.currentQuestion) {
@@ -438,6 +471,7 @@ renderCategories();
 loadStates().catch((error) => setStatus(error.message));
 updateStateVisibility();
 updateDepthDescription();
+updateButtonTextForState();
 updateSessionSummary();
 
 const params = new URLSearchParams(window.location.search);

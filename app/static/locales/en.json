@@ -16,6 +16,8 @@
   "app.lede": "Screen benefits, compare what-if scenarios, browse the official catalog, and leave with a clearer action plan grounded in government sources.",
 
   "home.startScreening": "Start Screening",
+  "home.trustPrivate": "Your data is private and never stored.",
+  "home.trustSources": "Data sourced directly from official government programs.",
   "home.scope": "Scope",
   "home.scopeBoth": "Federal and state",
   "home.scopeFederal": "Federal only",

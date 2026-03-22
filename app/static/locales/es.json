@@ -16,6 +16,8 @@
   "app.lede": "Evaluar beneficios, comparar escenarios hipoteticos, explorar el catalogo oficial y obtener un plan de accion basado en fuentes gubernamentales.",
 
   "home.startScreening": "Iniciar evaluacion",
+  "home.trustPrivate": "Sus datos son privados y nunca se guardan.",
+  "home.trustSources": "Los datos provienen directamente de programas gubernamentales oficiales.",
   "home.scope": "Alcance",
   "home.scopeBoth": "Federal y estatal",
   "home.scopeFederal": "Solo federal",
