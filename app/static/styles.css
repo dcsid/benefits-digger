@@ -185,6 +185,16 @@ button.ghost {
   color: var(--accent);
 }
 
+#refresh-review {
+  font-size: 0.82rem;
+  padding: 0.55rem 0.85rem;
+  line-height: 1.1;
+}
+
+#review-tasks {
+  margin-top: 0.45rem;
+}
+
 fieldset {
   border: 1px solid var(--line);
   border-radius: 18px;
