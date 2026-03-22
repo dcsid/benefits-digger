@@ -1298,6 +1298,10 @@ def get_candidate_programs(db: Session, session: ScreeningSession) -> list[Progr
     return filtered
 
 
+def candidate_program_count(db: Session, session: ScreeningSession) -> int:
+    return len(get_candidate_programs(db, session))
+
+
 def result_sort_key(result: dict[str, Any]) -> tuple[int, int]:
     status_rank = {
         "likely_eligible": 3,

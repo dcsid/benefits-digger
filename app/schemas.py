@@ -63,6 +63,7 @@ class SessionEnvelope(BaseModel):
     session_id: str
     next_question: Optional[QuestionOut]
     provisional_result_count: int = 0
+    program_count: int = 0
 
 
 class CompareScenarioInput(BaseModel):

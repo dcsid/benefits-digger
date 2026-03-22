@@ -34,6 +34,7 @@ from app.services import (
     list_program_catalog,
     list_review_tasks,
     list_states,
+    candidate_program_count,
     provisional_result_count,
     serialize_question,
     sync_remote_sources,
@@ -247,6 +248,7 @@ def create_screening_session(payload: SessionCreatePayload, db: Session = Depend
         session_id=session.public_id,
         next_question=serialize_question(db, next_question, session.depth_value),
         provisional_result_count=provisional_result_count(db, session),
+        program_count=candidate_program_count(db, session),
     )
 
 
@@ -268,6 +270,7 @@ def answer_screening_question(
         session_id=session.public_id,
         next_question=serialize_question(db, next_question, session.depth_value),
         provisional_result_count=provisional_result_count(db, session),
+        program_count=candidate_program_count(db, session),
     )
 
 

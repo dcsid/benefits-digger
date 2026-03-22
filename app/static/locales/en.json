@@ -50,6 +50,7 @@
   "home.breadthApprox": "{description} (~{count} questions)",
   "home.depthApprox": "{description}",
   "home.noMoreQuestions": "No more questions queued. Results are ready.",
+  "home.noProgramsFound": "We couldn't find any benefit programs matching your selection. Try broadening your categories or selecting a different state.",
   "home.selectCategory": "Select at least one category before applying your selections.",
   "home.chooseScope": "Choose a screening scope before starting your session.",
   "home.chooseStateMsg": "Please choose a state before starting state or combined screening.",

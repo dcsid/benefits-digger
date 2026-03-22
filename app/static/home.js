@@ -215,7 +215,9 @@ function renderQuestion(question) {
   state.currentQuestion = question;
   setScreeningFinished(!question);
   if (!question) {
-    questionEmpty.textContent = t("home.noMoreQuestions");
+    questionEmpty.textContent = state.programCount === 0
+      ? t("home.noProgramsFound")
+      : t("home.noMoreQuestions");
     questionEmpty.classList.remove("hidden");
     questionForm.classList.add("hidden");
     questionCompleteActions?.classList.remove("hidden");
@@ -674,6 +676,7 @@ startForm.addEventListener("submit", async (event) => {
         body: JSON.stringify({ answers: filteredPrefills }),
       });
     }
+    state.programCount = envelope.program_count || 0;
     questionTrail = envelope.next_question ? [envelope.next_question] : [];
     questionCursor = envelope.next_question ? 0 : -1;
     answerMap = {};
@@ -719,6 +722,7 @@ questionForm.addEventListener("submit", async (event) => {
       }),
     });
 
+    state.programCount = payload.program_count || 0;
     if (payload.next_question) {
       questionTrail.push(payload.next_question);
       questionCursor = questionTrail.length - 1;

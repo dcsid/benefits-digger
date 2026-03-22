@@ -9,6 +9,7 @@ const state = {
   activeScope: localStorage.getItem("bd_active_scope") || null,
   adminKey: sessionStorage.getItem("bd_admin_key") || "",
   isScreeningFinished: localStorage.getItem("bd_screening_finished") === "1",
+  programCount: 0,
 };
 
 /* ── i18n translation system ─────────────────────────────────── */

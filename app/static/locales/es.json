@@ -50,6 +50,7 @@
   "home.breadthApprox": "{description} (~{count} preguntas)",
   "home.depthApprox": "{description}",
   "home.noMoreQuestions": "No hay mas preguntas en cola. Los resultados estan listos.",
+  "home.noProgramsFound": "No pudimos encontrar programas de beneficios que coincidan con su seleccion. Intente ampliar sus categorias o seleccionar un estado diferente.",
   "home.selectCategory": "Seleccione al menos una categoria antes de aplicar sus selecciones.",
   "home.chooseScope": "Elija un alcance de evaluacion antes de iniciar su sesion.",
   "home.chooseStateMsg": "Elija un estado antes de iniciar la evaluacion estatal o combinada.",
