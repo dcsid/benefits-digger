@@ -9,12 +9,69 @@ const sourceHub = document.querySelector("#source-hub");
 const planningNotes = document.querySelector("#planning-notes");
 const documentChecklist = document.querySelector("#document-checklist");
 
+function controlsForTarget(target) {
+  if (!target) return [];
+  return [...document.querySelectorAll(`.dashboard-nav-btn[data-scroll-target="#${target.id}"]`)];
+}
+
+function syncDashboardTargetNavState(target) {
+  if (!target) return;
+  const controls = controlsForTarget(target);
+  const canScroll = target.scrollHeight > target.clientHeight + 2;
+  const atStart = target.scrollTop <= 2;
+  const atEnd = target.scrollTop + target.clientHeight >= target.scrollHeight - 2;
+
+  controls.forEach((button) => {
+    const isUp = button.dataset.scrollDirection === "up";
+    button.classList.remove("hidden");
+    if (!canScroll) {
+      button.disabled = true;
+      return;
+    }
+    button.disabled = isUp ? atStart : atEnd;
+  });
+}
+
+function scrollContainerToNeighborCard(container, direction) {
+  if (!container) return;
+  const cards = [...container.querySelectorAll(":scope > .mini-card, :scope > .card, :scope > .task")];
+  if (!cards.length) {
+    container.scrollBy({ top: direction === "down" ? 180 : -180, behavior: "smooth" });
+    return;
+  }
+
+  const containerTop = container.getBoundingClientRect().top;
+  const currentIndex = cards.findIndex((card) => {
+    const rect = card.getBoundingClientRect();
+    return rect.top <= containerTop + 12 && rect.bottom > containerTop + 12;
+  });
+  const normalizedIndex = currentIndex === -1
+    ? (container.scrollTop <= 2 ? 0 : cards.length - 1)
+    : currentIndex;
+  const targetIndex = direction === "down"
+    ? Math.min(cards.length - 1, normalizedIndex + 1)
+    : Math.max(0, normalizedIndex - 1);
+  const targetRect = cards[targetIndex].getBoundingClientRect();
+  const targetTop = container.scrollTop + (targetRect.top - containerTop);
+  container.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+}
+
+function syncDashboardScrollableSections() {
+  const targets = [benefitStack, missingFacts, actionPlan, sourceHub];
+  targets.forEach((target) => {
+    if (!target) return;
+    target.classList.add("dashboard-scroll-target");
+    syncDashboardTargetNavState(target);
+  });
+}
+
 function renderPlan(plan) {
   state.latestPlan = plan;
   if (!plan) {
     planShell.classList.add("hidden");
     planEmpty.classList.remove("hidden");
     planDepthPill.textContent = t("dashboard.noSession");
+    syncDashboardScrollableSections();
     return;
   }
 
@@ -122,6 +179,8 @@ function renderPlan(plan) {
         .map((note) => `<article class="mini-card"><p>${escapeHtml(translateDynamicText(note))}</p></article>`)
         .join("")
     : `<p class='meta'>${t("dashboard.noPlanningNotes")}</p>`;
+
+  syncDashboardScrollableSections();
 }
 
 async function loadPlan() {
@@ -155,6 +214,27 @@ document.querySelector("#download-pdf").addEventListener("click", () => {
       setBusyButtonText(btn, false, t("dashboard.generatingPdf"), t("dashboard.downloadPdf"));
       btn.disabled = false;
     });
+});
+
+document.querySelectorAll(".dashboard-nav-btn").forEach((button) => {
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    const targetSelector = button.dataset.scrollTarget;
+    const direction = button.dataset.scrollDirection === "up" ? "up" : "down";
+    const container = targetSelector ? document.querySelector(targetSelector) : null;
+    scrollContainerToNeighborCard(container, direction);
+    if (container) {
+      window.setTimeout(() => syncDashboardTargetNavState(container), 220);
+    }
+  });
+});
+
+[benefitStack, missingFacts, actionPlan, sourceHub].forEach((target) => {
+  target?.addEventListener("scroll", () => syncDashboardTargetNavState(target));
+});
+
+window.addEventListener("resize", () => {
+  if (state.latestPlan) syncDashboardScrollableSections();
 });
 
 loadPlan().catch((error) => {

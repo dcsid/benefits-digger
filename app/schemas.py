@@ -42,6 +42,7 @@ class SessionCreatePayload(BaseModel):
 
 class AnswerPayload(BaseModel):
     answers: dict[str, Any] = Field(default_factory=dict)
+    replace_answers: bool = False
 
 
 class QuestionOptionOut(BaseModel):

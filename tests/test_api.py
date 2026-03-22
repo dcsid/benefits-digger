@@ -493,6 +493,48 @@ def test_breadth_controls_how_many_questions_are_asked() -> None:
         assert broad_follow_up.json()["next_question"] is not None
 
 
+def test_state_context_does_not_consume_question_budget() -> None:
+    with TestClient(app) as client:
+        create_response = client.post(
+            "/api/v1/sessions",
+            json={
+                "scope": "both",
+                "state_code": "NY",
+                "categories": ["all"],
+                "breadth_value": 0.0,
+                "depth_value": 1.0,
+            },
+        )
+        assert create_response.status_code == 200
+
+        session_id = create_response.json()["session_id"]
+        next_question = create_response.json()["next_question"]
+
+        def auto_answer(question: dict):
+            if question.get("input_type") == "radio" and question.get("options"):
+                return question["options"][0]["value"]
+            if question.get("input_type") == "select" and question.get("options"):
+                return question["options"][0]["value"]
+            if question.get("input_type") == "date":
+                return "1980-01-01"
+            if question.get("input_type") in {"number", "currency"}:
+                return 1
+            return "Yes"
+
+        answered = 0
+        # breadth_value=0.0 maps to max_answers=4.
+        while next_question is not None and answered < 10:
+            answered += 1
+            response = client.post(
+                f"/api/v1/sessions/{session_id}/answers",
+                json={"answers": {next_question["key"]: auto_answer(next_question)}},
+            )
+            assert response.status_code == 200
+            next_question = response.json()["next_question"]
+
+        assert answered == 4
+
+
 def test_depth_controls_question_specificity() -> None:
     with TestClient(app) as client:
         high_level_response = client.post(

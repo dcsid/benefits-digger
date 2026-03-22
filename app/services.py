@@ -724,7 +724,18 @@ def get_session_or_404(db: Session, public_id: str) -> ScreeningSession:
     return session
 
 
-def upsert_answers(db: Session, session: ScreeningSession, answers: dict[str, Any]) -> None:
+def upsert_answers(
+    db: Session,
+    session: ScreeningSession,
+    answers: dict[str, Any],
+    *,
+    replace_answers: bool = False,
+) -> None:
+    if replace_answers:
+        existing_rows = db.scalars(select(SessionAnswer).where(SessionAnswer.session_id == session.id)).all()
+        for row in existing_rows:
+            if row.question_key not in answers:
+                db.delete(row)
     for key, value in answers.items():
         variant = resolve_question_variant(db, key, session.depth_value)
         if variant and variant.normalizer:
@@ -758,7 +769,7 @@ def get_next_question(db: Session, session: ScreeningSession, answers: dict[str,
     if session.scope in {"state", "both"} and not session.state_code and "state_code" not in answers:
         return db.scalar(select(Question).where(Question.key == "state_code"))
 
-    if len(answers) >= policy["max_answers"]:
+    if count_screening_answers(answers) >= policy["max_answers"]:
         return None
 
     scores = score_unanswered_questions(db, session, answers, enforce_depth_unlocks=True)
@@ -848,7 +859,7 @@ def compute_plan(db: Session, session: ScreeningSession) -> dict[str, Any]:
             "likely_federal_programs": likely_federal,
             "likely_state_programs": likely_state,
             "average_rule_coverage": average_coverage,
-            "answered_questions": len(answers),
+            "answered_questions": count_screening_answers(answers),
             "next_question_key": next_question.key if next_question else None,
             "estimated_monthly_total": round(estimated_monthly),
         },
@@ -1305,6 +1316,11 @@ def question_is_unlocked(question: Question, answers_count: int, policy: dict[st
     return answers_count >= unlock_after
 
 
+def count_screening_answers(answers: dict[str, Any]) -> int:
+    """Count user-provided screening answers, excluding implicit context fields."""
+    return sum(1 for key in answers if key != "state_code")
+
+
 def score_unanswered_questions(
     db: Session,
     session: ScreeningSession,
@@ -1317,7 +1333,7 @@ def score_unanswered_questions(
     focused_scores: dict[str, float] = {}
     non_referral_scores: dict[str, float] = {}
     candidate_programs = get_candidate_programs(db, session)
-    answers_count = len(answers)
+    answers_count = count_screening_answers(answers)
     selected_categories = {
         category for category in session.categories_json or [] if category and category != "all"
     }

@@ -2,6 +2,10 @@ const scopeSelect = document.querySelector("#scope");
 const stateSelect = document.querySelector("#state-code");
 const stateValidation = document.querySelector("#state-validation");
 const startScreeningPanel = document.querySelector("#start-screening-panel");
+const setupView = document.querySelector("#setup-view");
+const questionView = document.querySelector("#question-view");
+const sessionSummary = document.querySelector("#session-summary");
+const editSetupButton = document.querySelector("#edit-setup");
 const depthSlider = document.querySelector("#depth-slider");
 const depthPills = [...document.querySelectorAll(".depth-pill")];
 const depthDescription = document.querySelector("#depth-description");
@@ -9,11 +13,10 @@ const startForm = document.querySelector("#start-form");
 const questionForm = document.querySelector("#question-form");
 const questionShell = document.querySelector("#question-shell");
 const questionEmpty = document.querySelector("#question-empty");
+const questionCompleteActions = document.querySelector("#question-complete-actions");
+const backQuestionButton = document.querySelector("#back-question");
+const backQuestionCompleteButton = document.querySelector("#back-question-complete");
 const categoryList = document.querySelector("#category-list");
-const adminKeyInput = document.querySelector("#admin-key");
-const saveAdminKeyButton = document.querySelector("#save-admin-key");
-const clearAdminKeyButton = document.querySelector("#clear-admin-key");
-
 const lifeChatLauncher = document.querySelector("#life-chat-launcher");
 const lifeChatPopover = document.querySelector("#life-chat-popover");
 const lifeChatHeader = document.querySelector(".life-chat-header");
@@ -26,6 +29,9 @@ const lifeChatInput = document.querySelector("#life-chat-input");
 const lifeChatSendButton = document.querySelector("#life-chat-send");
 const lifeChatAssistantStatus = document.querySelector("#life-chat-assistant-status");
 
+let questionTrail = [];
+let questionCursor = -1;
+let answerMap = {};
 const intakeState = {
   description: "",
   payload: null,
@@ -36,10 +42,49 @@ const intakeState = {
   isProbeLoading: false,
 };
 
-function saveAdminKeyFromInput() {
-  if (!adminKeyInput) return;
-  setAdminKey(adminKeyInput.value);
-  setStatus(adminKeyInput.value.trim() ? t("home.adminSaved") : t("home.adminCleared"));
+function syncBackButtons() {
+  const canGoBackInForm = !state.isScreeningFinished && questionCursor > 0;
+  const canGoBackFromComplete = state.isScreeningFinished && questionTrail.length > 0;
+  if (backQuestionButton) backQuestionButton.disabled = !canGoBackInForm;
+  if (backQuestionCompleteButton) backQuestionCompleteButton.disabled = !canGoBackFromComplete;
+}
+
+function restoreCurrentAnswer(question) {
+  if (!question) return;
+  const stored = answerMap[question.key];
+  if (stored === undefined || stored === null) return;
+
+  const radioNodes = [...questionShell.querySelectorAll('input[type="radio"][name="answer"]')];
+  if (radioNodes.length) {
+    radioNodes.forEach((input) => {
+      input.checked = `${input.value}` === `${stored}`;
+    });
+    return;
+  }
+
+  const field = questionShell.querySelector('[name="answer"]');
+  if (field) field.value = stored;
+}
+
+function pruneAnswersToTrail() {
+  const keep = new Set(questionTrail.map((question) => question.key));
+  Object.keys(answerMap).forEach((key) => {
+    if (!keep.has(key)) delete answerMap[key];
+  });
+}
+
+function goBackOneQuestion() {
+  if (!questionTrail.length) return;
+
+  if (state.isScreeningFinished) {
+    questionCursor = questionTrail.length - 1;
+    renderQuestion(questionTrail[questionCursor]);
+    return;
+  }
+
+  if (questionCursor <= 0) return;
+  questionCursor -= 1;
+  renderQuestion(questionTrail[questionCursor]);
 }
 
 function setStateValidation(message = "") {
@@ -76,14 +121,8 @@ async function loadStates() {
 }
 
 function selectedCategories() {
-  return [...document.querySelectorAll('input[name="category"]:checked')].map((box) => box.value);
-}
-
-function setSelectedCategories(values = []) {
-  const selected = new Set(values);
-  document.querySelectorAll('input[name="category"]').forEach((input) => {
-    input.checked = selected.has(input.value);
-  });
+  const boxes = [...document.querySelectorAll('input[name="category"]:checked')];
+  return boxes.map((box) => box.value);
 }
 
 function updateStateVisibility() {
@@ -92,24 +131,14 @@ function updateStateVisibility() {
   if (scope === "federal") setStateValidation("");
 }
 
-function estimateDepthQuestionCount(depthValue) {
-  const v = Math.max(0, Math.min(1, depthValue));
-  if (v <= 0.5) {
-    const ratio = v / 0.5;
-    return Math.round(4 + (10 - 4) * ratio);
-  }
-  const ratio = (v - 0.5) / 0.5;
-  return Math.round(10 + (24 - 10) * ratio);
-}
-
 function updateDepthDescription() {
   const val = parseFloat(depthSlider.value);
   let best = depthDescriptions[0];
-  for (const descriptor of depthDescriptions) {
-    if (Math.abs(descriptor.at - val) < Math.abs(best.at - val)) best = descriptor;
+  for (const d of depthDescriptions) {
+    if (Math.abs(d.at - val) < Math.abs(best.at - val)) best = d;
   }
-  const descriptor = getDepthDescriptor(best.at);
   const maxQ = estimateDepthQuestionCount(val);
+  const descriptor = getDepthDescriptor(best.at);
   depthDescription.textContent = t("home.breadthApprox", { description: descriptor.text, count: maxQ });
 
   depthPills.forEach((pill) => {
@@ -120,17 +149,58 @@ function updateDepthDescription() {
   });
 }
 
+function estimateDepthQuestionCount(depthValue) {
+  // Keep this consistent with backend DEPTH_ANCHORS interpolation.
+  const v = Math.max(0, Math.min(1, depthValue));
+  if (v <= 0.5) {
+    const t = v / 0.5;
+    return Math.round(4 + (10 - 4) * t);
+  }
+  const t = (v - 0.5) / 0.5;
+  return Math.round(10 + (24 - 10) * t);
+}
+
+function updateButtonTextForState() {
+  const submitBtn = document.querySelector("#start-form button[type='submit']");
+  if (!submitBtn) return;
+  
+  const scope = scopeSelect.value;
+  const stateCode = stateSelect.value;
+  
+  let buttonText = "Start My Screening";
+  
+  // Try to get localized version
+  const localizedStart = t("home.startScreening");
+  if (localizedStart && !localizedStart.includes("home.")) {
+    buttonText = localizedStart;
+  }
+  
+  // If state is selected and not federal-only, personalize
+  if (stateCode && scope !== "federal") {
+    const stateOption = stateSelect.options[stateSelect.selectedIndex];
+    if (stateOption) {
+      const stateName = stateOption.textContent.split('(')[0].trim();
+      buttonText = `Find ${stateName} Benefits`;
+    }
+  }
+  
+  submitBtn.textContent = buttonText;
+}
+
 function renderCategories() {
   const selected = new Set(selectedCategories());
   categoryList.innerHTML = categoryDefinitions
     .map(
-      (category) => `
+      (category) => {
+        const label = getCategoryLabel(category.value) || category.label;
+        return `
         <label class="category-option">
           <input type="checkbox" name="category" value="${category.value}" ${selected.has(category.value) ? "checked" : ""} />
           <span class="category-icon" aria-hidden="true">${category.icon || "•"}</span>
-          <span>${escapeHtml(getCategoryLabel(category.value))}</span>
+          <span>${escapeHtml(label)}</span>
         </label>
-      `,
+      `;
+      },
     )
     .join("");
 }
@@ -148,11 +218,14 @@ function renderQuestion(question) {
     questionEmpty.textContent = t("home.noMoreQuestions");
     questionEmpty.classList.remove("hidden");
     questionForm.classList.add("hidden");
+    questionCompleteActions?.classList.remove("hidden");
+    syncBackButtons();
     return;
   }
 
   questionEmpty.classList.add("hidden");
   questionForm.classList.remove("hidden");
+  questionCompleteActions?.classList.add("hidden");
 
   const translatedPrompt = translateDynamicText(question.prompt);
   const translatedHintText = translateDynamicText(question.hint);
@@ -164,7 +237,7 @@ function renderQuestion(question) {
       .map(
         (option) => `
           <label class="choice">
-            <input type="radio" name="answer" value="${escapeHtml(option.value)}" required />
+            <input type="radio" name="answer" value="${option.value}" required />
             <span>${escapeHtml(translateDynamicText(option.label))}</span>
           </label>
         `,
@@ -175,7 +248,7 @@ function renderQuestion(question) {
       <select name="answer" required>
         <option value="">${escapeHtml(t("home.chooseOne"))}</option>
         ${question.options
-          .map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(translateDynamicText(option.label))}</option>`)
+          .map((option) => `<option value="${option.value}">${escapeHtml(translateDynamicText(option.label))}</option>`)
           .join("")}
       </select>
     `;
@@ -186,6 +259,7 @@ function renderQuestion(question) {
   } else {
     inputMarkup = '<input type="text" name="answer" required />';
   }
+
 
   questionShell.innerHTML = `
     <div class="stack">
@@ -199,27 +273,12 @@ function renderQuestion(question) {
       </label>
     </div>
   `;
-}
-
-function scopeLabel(scope) {
-  const key = `intake.scope.${scope}`;
-  const translated = t(key);
-  return translated !== key ? translated : scope;
-}
-
-function factLabel(fact) {
-  const key = `intake.fact.${fact.key}`;
-  const translated = t(key);
-  return translated !== key ? translated : (fact.label || fact.key);
+  restoreCurrentAnswer(question);
+  syncBackButtons();
 }
 
 function getLifeAssistantName() {
   return t("home.lifeAssistantName");
-}
-
-function getNavigationActionLabel(action) {
-  const translated = t(`home.navAction.${action.key}`);
-  return translated !== `home.navAction.${action.key}` ? translated : action.label;
 }
 
 function getLifeChatWelcomeMessage() {
@@ -268,22 +327,21 @@ function buildLifeChatSuggestions() {
   return [];
 }
 
-function syncLifePayloadToForm({ announce = false, scroll = false } = {}) {
+function syncLifePayloadToForm() {
   if (!intakeState.payload) return;
   scopeSelect.value = intakeState.payload.suggested_scope || "federal";
   if (intakeState.payload.applied_state_code) {
     stateSelect.value = intakeState.payload.applied_state_code;
   }
   const categoryKeys = (intakeState.payload.suggested_categories || []).map((category) => category.key);
-  setSelectedCategories(categoryKeys);
+  setAllCategories(false);
+  document.querySelectorAll('input[name="category"]').forEach((input) => {
+    input.checked = categoryKeys.includes(input.value);
+  });
   updateStateVisibility();
+  updateButtonTextForState();
+  updateSessionSummary();
   setStateValidation("");
-  if (announce) {
-    setStatus(t("home.lifeApplyDone"));
-  }
-  if (scroll) {
-    scrollToTopOf(startScreeningPanel);
-  }
 }
 
 function resetLifeChat() {
@@ -418,77 +476,7 @@ function clearLifeIntake() {
   closeLifeChat();
   resetLifeChat();
   if (lifeChatInput) lifeChatInput.value = "";
-  setLifeIntakeStatus("");
   renderLifeIntake(null);
-}
-
-function applyIntakeSuggestionsToForm() {
-  if (!intakeState.payload) return;
-  syncLifePayloadToForm({ announce: true, scroll: true });
-}
-
-function buildSessionPayload({ scope, stateCode, categories }) {
-  return {
-    scope,
-    state_code: stateCode || null,
-    categories,
-    depth_value: parseFloat(depthSlider.value),
-  };
-}
-
-async function startScreeningFlow(payload, prefillAnswers = {}) {
-  const submitBtn = startForm.querySelector("button[type='submit']");
-  try {
-    setStateValidation("");
-    if (!payload.categories?.length) {
-      setStatus(t("home.selectCategory"));
-      return;
-    }
-    if (!payload.scope) {
-      setStatus(t("home.chooseScope"));
-      return;
-    }
-    if (payload.scope !== "federal" && !payload.state_code) {
-      const msg = t("home.chooseStateMsg");
-      setStatus(msg);
-      setStateValidation(msg);
-      return;
-    }
-
-    if (submitBtn) {
-      setLoading(submitBtn, true);
-      setBusyButtonText(submitBtn, true, t("home.searching"), t("home.apply"));
-    }
-
-    setActiveScope(payload.scope);
-    setStatus(payload.scope === "federal" ? t("home.creatingSession") : t("home.creatingSessionState"));
-    const session = await getJson("/api/v1/sessions", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-
-    setSessionId(session.session_id);
-    let envelope = session;
-    const filteredPrefills = Object.fromEntries(
-      Object.entries(prefillAnswers || {}).filter(([, value]) => value !== null && value !== ""),
-    );
-    if (Object.keys(filteredPrefills).length) {
-      envelope = await getJson(`/api/v1/sessions/${session.session_id}/answers`, {
-        method: "POST",
-        body: JSON.stringify({ answers: filteredPrefills }),
-      });
-    }
-
-    renderQuestion(envelope.next_question);
-    setStatus(t("home.sessionLive", { sessionId: state.sessionId }));
-  } catch (error) {
-    setStatus(t("home.sessionError", { error: error.message }));
-  } finally {
-    if (submitBtn) {
-      setLoading(submitBtn, false);
-      setBusyButtonText(submitBtn, false, t("home.searching"), t("home.apply"));
-    }
-  }
 }
 
 async function interpretLifeChat(description) {
@@ -577,12 +565,37 @@ async function sendLifeProbe(message) {
   }
 }
 
+function showQuestionView() {
+  setupView?.classList.add("hidden");
+  questionView?.classList.remove("hidden");
+}
+
+function showSetupView() {
+  questionView?.classList.add("hidden");
+  setupView?.classList.remove("hidden");
+  scrollToTopOf(startScreeningPanel);
+}
+
+function updateSessionSummary() {
+  if (!sessionSummary) return;
+  const scopeText = scopeSelect.options[scopeSelect.selectedIndex]?.textContent || "Federal and state";
+  const stateText = stateSelect.value
+    ? stateSelect.options[stateSelect.selectedIndex]?.textContent || stateSelect.value
+    : "No state filter";
+  const depthText = getDepthDescriptor(parseFloat(depthSlider.value)).label;
+  const categoryCount = selectedCategories().length;
+  sessionSummary.textContent = `Currently searching: ${scopeText} | ${stateText} | ${depthText} depth | ${categoryCount} categories.`;
+}
+
 function resetApp() {
   setSessionId(null);
   setActiveScope(null);
   state.currentQuestion = null;
   state.latestPlan = null;
   setScreeningFinished(false);
+  questionTrail = [];
+  questionCursor = -1;
+  answerMap = {};
 
   scopeSelect.value = "both";
   stateSelect.value = "";
@@ -590,11 +603,16 @@ function resetApp() {
   setAllCategories(false);
   updateStateVisibility();
   updateDepthDescription();
+  updateButtonTextForState();
+  updateSessionSummary();
 
   questionForm.classList.add("hidden");
   questionShell.innerHTML = "";
   questionEmpty.textContent = t("home.questionEmpty");
   questionEmpty.classList.remove("hidden");
+  questionCompleteActions?.classList.add("hidden");
+  syncBackButtons();
+  showSetupView();
 
   clearLifeIntake();
   setStatus("");
@@ -602,13 +620,74 @@ function resetApp() {
 
 startForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  await startScreeningFlow(
-    buildSessionPayload({
+  const submitBtn = startForm.querySelector("button[type='submit']");
+  if (submitBtn && submitBtn.disabled) return;
+  try {
+    setStateValidation("");
+    const categories = selectedCategories();
+    if (!categories.length) {
+      setStatus(t("home.selectCategory"));
+      return;
+    }
+    if (!scopeSelect.value) {
+      setStatus(t("home.chooseScope"));
+      scrollToTopOf(startScreeningPanel);
+      scopeSelect.focus();
+      return;
+    }
+    if (scopeSelect.value !== "federal" && !stateSelect.value) {
+      const msg = t("home.chooseStateMsg");
+      setStatus(msg);
+      setStateValidation(msg);
+      scrollToTopOf(startScreeningPanel);
+      stateSelect.focus();
+      return;
+    }
+
+    if (submitBtn) {
+      setLoading(submitBtn, true);
+      setBusyButtonText(submitBtn, true, t("home.searching"), t("home.apply"));
+    }
+
+    const hasState = scopeSelect.value !== "federal" && stateSelect.value;
+    setStatus(hasState ? t("home.creatingSessionState") : t("home.creatingSession"));
+    const payload = {
       scope: scopeSelect.value,
-      stateCode: stateSelect.value,
-      categories: selectedCategories(),
-    }),
-  );
+      state_code: stateSelect.value || null,
+      categories,
+      depth_value: parseFloat(depthSlider.value),
+    };
+    setActiveScope(payload.scope);
+    const session = await getJson("/api/v1/sessions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    setSessionId(session.session_id);
+    let envelope = session;
+    const filteredPrefills = Object.fromEntries(
+      Object.entries(intakeState.payload?.prefill_answers || {}).filter(([, value]) => value !== null && value !== ""),
+    );
+    if (Object.keys(filteredPrefills).length) {
+      envelope = await getJson(`/api/v1/sessions/${session.session_id}/answers`, {
+        method: "POST",
+        body: JSON.stringify({ answers: filteredPrefills }),
+      });
+    }
+    questionTrail = envelope.next_question ? [envelope.next_question] : [];
+    questionCursor = envelope.next_question ? 0 : -1;
+    answerMap = {};
+    renderQuestion(envelope.next_question);
+    updateSessionSummary();
+    showQuestionView();
+    setStatus(t("home.sessionLive", { sessionId: state.sessionId }));
+  } catch (error) {
+    setStatus(t("home.sessionError", { error: error.message }));
+  } finally {
+    if (submitBtn) {
+      setLoading(submitBtn, false);
+      setBusyButtonText(submitBtn, false, t("home.searching"), t("home.apply"));
+    }
+  }
 });
 
 questionForm.addEventListener("submit", async (event) => {
@@ -624,14 +703,25 @@ questionForm.addEventListener("submit", async (event) => {
   }
   try {
     if (submitBtn) setLoading(submitBtn, true);
+    const currentQuestion = questionTrail[questionCursor] || state.currentQuestion;
+    answerMap[currentQuestion.key] = value;
+
+    questionTrail = questionTrail.slice(0, questionCursor + 1);
+    pruneAnswersToTrail();
+
     const payload = await getJson(`/api/v1/sessions/${state.sessionId}/answers`, {
       method: "POST",
       body: JSON.stringify({
-        answers: {
-          [state.currentQuestion.key]: value,
-        },
+        answers: answerMap,
+        replace_answers: true,
       }),
     });
+
+    if (payload.next_question) {
+      questionTrail.push(payload.next_question);
+      questionCursor = questionTrail.length - 1;
+    }
+
     renderQuestion(payload.next_question);
     setStatus(t("home.answerSaved"));
   } catch (error) {
@@ -676,14 +766,6 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-lifeChatPopover?.addEventListener("click", (event) => {
-  const closeTarget = event.target.closest("#life-chat-close");
-  if (closeTarget) {
-    event.preventDefault();
-    closeLifeChat();
-  }
-});
-
 document.addEventListener("click", (event) => {
   if (!intakeState.chatOpen) return;
   const target = event.target;
@@ -692,17 +774,36 @@ document.addEventListener("click", (event) => {
   closeLifeChat();
 });
 
-document.querySelector("#show-results").addEventListener("click", () => {
+function goToResultsPage() {
   window.location.href = "/results";
+}
+
+document.querySelector("#show-results")?.addEventListener("click", async () => {
+  try {
+    goToResultsPage();
+  } catch (error) {
+    setStatus(t("results.loadError", { error: error.message }));
+  }
 });
 
+document.querySelector("#show-results-complete")?.addEventListener("click", async () => {
+  try {
+    goToResultsPage();
+  } catch (error) {
+    setStatus(t("results.loadError", { error: error.message }));
+  }
+});
+backQuestionButton?.addEventListener("click", goBackOneQuestion);
+backQuestionCompleteButton?.addEventListener("click", goBackOneQuestion);
 document.querySelector("#select-all-categories").addEventListener("click", () => setAllCategories(true));
 document.querySelector("#clear-categories").addEventListener("click", () => setAllCategories(false));
-document.querySelector("#reset-button").addEventListener("click", resetApp);
-
-scopeSelect.addEventListener("change", updateStateVisibility);
+scopeSelect.addEventListener("change", () => {
+  updateStateVisibility();
+  updateButtonTextForState();
+});
 stateSelect.addEventListener("change", () => {
   if (stateSelect.value) setStateValidation("");
+  updateButtonTextForState();
 });
 depthSlider.addEventListener("input", updateDepthDescription);
 depthPills.forEach((pill) => {
@@ -713,23 +814,15 @@ depthPills.forEach((pill) => {
     updateDepthDescription();
   });
 });
+editSetupButton?.addEventListener("click", showSetupView);
 
-saveAdminKeyButton?.addEventListener("click", saveAdminKeyFromInput);
-clearAdminKeyButton?.addEventListener("click", () => {
-  if (!adminKeyInput) return;
-  adminKeyInput.value = "";
-  saveAdminKeyFromInput();
-});
-adminKeyInput?.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    saveAdminKeyFromInput();
-  }
-});
+document.querySelector("#reset-button").addEventListener("click", resetApp);
 
 document.addEventListener("localechange", () => {
   renderCategories();
   updateDepthDescription();
+  updateButtonTextForState();
+  updateSessionSummary();
   loadStates().catch((error) => setStatus(error.message));
   renderLifeIntake(intakeState.payload);
   if (state.currentQuestion) {
@@ -745,4 +838,16 @@ renderCategories();
 loadStates().catch((error) => setStatus(error.message));
 updateStateVisibility();
 updateDepthDescription();
+updateButtonTextForState();
+updateSessionSummary();
 renderLifeIntake(null);
+
+const params = new URLSearchParams(window.location.search);
+if (params.get("redo") === "1") {
+  resetApp();
+  params.delete("redo");
+  const query = params.toString();
+  window.history.replaceState({}, "", query ? `/?${query}` : "/");
+} else {
+  syncBackButtons();
+}

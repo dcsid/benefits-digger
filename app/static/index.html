@@ -11,8 +11,8 @@
       <nav class="nav-bar wide">
         <a href="/" class="nav-link nav-link--active" aria-current="page" data-i18n="nav.home">Home</a>
         <a href="/dashboard" class="nav-link" data-i18n="nav.dashboard">Dashboard</a>
-        <a href="/results" class="nav-link hidden" id="nav-results" data-i18n="nav.results">Results</a>
-        <!-- <a href="/whatif" class="nav-link" data-i18n="nav.whatif">What-If Lab</a> -->
+        <a href="/results" class="nav-link" data-i18n="nav.results">Results</a>
+        <a href="/whatif" class="nav-link" data-i18n="nav.whatif">What-If Lab</a>
         <a href="/explorer" class="nav-link" data-i18n="nav.explorer">Explorer</a>
         <select id="lang-select" class="lang-select" onchange="loadLocale(this.value)">
           <option value="en" data-i18n="lang.en">English</option>
@@ -83,96 +83,112 @@
               type="text"
               data-i18n="home.lifeChatPlaceholder"
               data-i18n-attr="placeholder"
-              placeholder="Type a short reply like “yes”, “I’m in New York”, or “I’m in school right now.”"
+              placeholder="Try: I lost my job, I am behind on rent, and I need help with food."
             />
-            <button type="submit" id="life-chat-send" data-i18n="home.lifeChatSend">Send follow-up</button>
+            <button type="submit" id="life-chat-send" data-i18n="home.lifeChatSend">Reply</button>
           </form>
         </div>
       </section>
 
-      <section class="panel" id="start-screening-panel">
-        <h2 data-i18n="home.startScreening">Start Screening</h2>
-        <form id="start-form" class="stack">
-          <label>
-            <span data-i18n="home.scope">Scope</span>
-            <select id="scope" name="scope">
-              <option value="both" data-i18n="home.scopeBoth">Federal and state</option>
-              <option value="federal" data-i18n="home.scopeFederal">Federal only</option>
-              <option value="state" data-i18n="home.scopeState">State only</option>
-            </select>
-          </label>
+      <section id="setup-view" class="wide setup-view">
+        <section class="panel setup-card" id="start-screening-panel">
+          <h2 data-i18n="home.startScreening">Start Screening</h2>
+          <form id="start-form" class="stack">
+            <label>
+              <span data-i18n="home.scope">Scope</span>
+              <select id="scope" name="scope">
+                <option value="both" data-i18n="home.scopeBoth">Federal and state</option>
+                <option value="federal" data-i18n="home.scopeFederal">Federal only</option>
+                <option value="state" data-i18n="home.scopeState">State only</option>
+              </select>
+            </label>
 
-          <label>
-            <span data-i18n="home.state">State</span>
-            <select id="state-code" name="state_code">
-              <option value="" data-i18n="home.chooseState">Choose a state</option>
-            </select>
-            <p id="state-validation" class="field-message hidden" aria-live="polite"></p>
-          </label>
+            <label>
+              <span data-i18n="home.state">State</span>
+              <select id="state-code" name="state_code">
+                <option value="" data-i18n="home.chooseState">Choose a state</option>
+              </select>
+              <p id="state-validation" class="field-message hidden" aria-live="polite"></p>
+            </label>
 
-          <label>
-            <span data-i18n="home.depth">Depth</span>
-            <input type="range" id="depth-slider" name="depth_value" min="0" max="1" step="0.01" value="0.5" />
-            <div class="depth-pills" role="group" aria-label="Depth presets">
-              <button type="button" class="depth-pill" data-depth-value="0">
-                <strong data-i18n="home.depthQuick">Quick</strong>
-                <span class="meta">~4 questions</span>
-              </button>
-              <button type="button" class="depth-pill" data-depth-value="0.5">
-                <strong data-i18n="home.depthStandard">Standard</strong>
-                <span class="meta">~10 questions</span>
-              </button>
-              <button type="button" class="depth-pill" data-depth-value="1">
-                <strong data-i18n="home.depthDeep">Deep</strong>
-                <span class="meta">~24 questions</span>
-              </button>
-            </div>
-          </label>
-          <p id="depth-description" class="meta">
-            Standard mixes broad screeners with some more specific follow-ups.
-          </p>
-
-          <fieldset class="category-picker">
-            <legend data-i18n="home.categories">Benefit categories</legend>
-            <p class="meta" data-i18n="home.categoriesHint">
-              Select at least one category to find benefits you may qualify for and information on how to apply.
+            <label>
+              <span data-i18n="home.depth">Depth</span>
+              <input type="range" id="depth-slider" name="depth_value" min="0" max="1" step="0.01" value="0.5" />
+              <div class="depth-pills" role="group" aria-label="Depth presets">
+                <button type="button" class="depth-pill" data-depth-value="0">
+                  <strong data-i18n="home.depthQuick">Quick</strong>
+                  <span class="meta">~4 questions</span>
+                </button>
+                <button type="button" class="depth-pill" data-depth-value="0.5">
+                  <strong data-i18n="home.depthStandard">Standard</strong>
+                  <span class="meta">~10 questions</span>
+                </button>
+                <button type="button" class="depth-pill" data-depth-value="1">
+                  <strong data-i18n="home.depthDeep">Deep</strong>
+                  <span class="meta">~24 questions</span>
+                </button>
+              </div>
+            </label>
+            <p id="depth-description" class="meta">
+              Standard mixes broad screeners with some more specific follow-ups.
             </p>
-            <div class="row">
-              <button type="button" id="select-all-categories" class="ghost" data-i18n="home.selectAll">Select all</button>
-              <button type="button" id="clear-categories" class="ghost" data-i18n="home.clear">Clear</button>
+
+            <fieldset class="category-picker">
+              <legend data-i18n="home.categories">Benefit categories</legend>
+              <p class="meta" data-i18n="home.categoriesHint">
+                Select at least one category to find benefits you may qualify for and information on how to apply.
+              </p>
+              <div class="row">
+                <button type="button" id="select-all-categories" class="ghost" data-i18n="home.selectAll">Select all</button>
+                <button type="button" id="clear-categories" class="ghost" data-i18n="home.clear">Clear</button>
+              </div>
+              <div id="category-list" class="category-grid"></div>
+            </fieldset>
+
+            <div class="row form-actions">
+              <button type="submit" class="start-button">Start My Screening</button>
+              <button type="button" id="reset-button" class="ghost" data-i18n="home.reset">Reset</button>
             </div>
-            <div id="category-list" class="category-grid"></div>
-          </fieldset>
 
-          <div class="row form-actions">
-            <button type="submit" data-i18n="home.apply">Apply selections</button>
-            <button type="button" id="reset-button" class="ghost" data-i18n="home.reset">Reset</button>
+            <div class="trust-badges">
+              <span class="trust-badge">
+                <span class="trust-icon">🔒</span>
+                <span data-i18n="home.trustPrivate" class="trust-text">Your data is private and never stored.</span>
+              </span>
+              <span class="trust-separator">|</span>
+              <span class="trust-badge">
+                <span class="trust-icon">🏛️</span>
+                <span data-i18n="home.trustSources" class="trust-text">Data sourced directly from official government programs.</span>
+              </span>
+            </div>
+          </form>
+        </section>
+      </section>
+
+      <section id="question-view" class="wide question-view hidden">
+        <section class="panel question-card">
+          <div class="row spread session-summary-row">
+            <p id="session-summary" class="meta">No active session yet.</p>
+            <button type="button" id="edit-setup" class="ghost subtle">Edit Setup</button>
           </div>
-        </form>
-        <p id="status" class="status"></p>
-      </section>
-
-      <section class="panel">
-        <h2 data-i18n="home.questionFlow">Question Flow</h2>
-        <div id="question-empty" class="empty" data-i18n="home.questionEmpty">Start a session to begin the screener.</div>
-        <form id="question-form" class="stack hidden">
-          <div id="question-shell"></div>
-          <div class="row">
-            <button type="submit" data-i18n="home.saveAnswer">Save Answer</button>
-            <button type="button" id="show-results" class="ghost" data-i18n="home.showResults">Show Results Now</button>
+          <h2 data-i18n="home.questionFlow">Question Flow</h2>
+          <div id="question-empty" class="empty" data-i18n="home.questionEmpty">Start a session to begin the screener.</div>
+          <div id="question-complete-actions" class="row hidden">
+            <button type="button" id="back-question-complete" class="ghost" data-i18n="home.backQuestion">Back to Previous Question</button>
+            <button type="button" id="show-results-complete" class="start-button" data-i18n="home.showResults">Show Results Now</button>
           </div>
-        </form>
+          <form id="question-form" class="stack hidden">
+            <div id="question-shell"></div>
+            <div class="row">
+              <button type="button" id="back-question" class="ghost" data-i18n="home.backQuestion">Back</button>
+              <button type="submit" data-i18n="home.saveAnswer">Save Answer</button>
+              <button type="button" id="show-results" class="ghost" data-i18n="home.showResults">Show Results Now</button>
+            </div>
+          </form>
+        </section>
       </section>
 
-      <!-- Review Queue – commented out for now
-      <section class="panel wide">
-        <div class="row spread">
-          <h2 data-i18n="home.reviewQueue">Review Queue</h2>
-          <button type="button" id="refresh-review" class="ghost" data-i18n="home.refreshQueue">Refresh Queue</button>
-        </div>
-        <div id="review-tasks" class="review-list empty" data-i18n="home.noReviewTasks">No review tasks yet.</div>
-      </section>
-      -->
+      <p id="status" class="status wide"></p>
     </main>
     <script src="/static/shared.js" defer></script>
     <script src="/static/home.js" defer></script>
