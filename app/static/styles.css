@@ -799,6 +799,29 @@ fieldset {
   font-size: 0.85rem;
 }
 
+.life-chat-actions {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.life-chat-action-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.life-chat-action-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(11, 110, 79, 0.14);
+  background: rgba(11, 110, 79, 0.05);
+  color: var(--accent);
+  font-size: 0.84rem;
+  text-decoration: none;
+}
+
 .life-chat-form {
   display: grid;
   gap: 0.6rem;

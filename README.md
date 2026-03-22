@@ -91,9 +91,10 @@ Configuration is managed via environment variables (or a `.env` file):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BENEFITS_DIGGER_GEMINI_API_KEY` | `""` | Google Gemini API key for AI-powered state program generation |
-| `BENEFITS_DIGGER_GEMINI_MODEL` | `gemini-3.1-flash-lite-preview` | Gemini model used across the app's LLM-backed features |
+| `BENEFITS_DIGGER_GEMINI_MODEL` | `gemini-3-pro-preview` | Gemini model used across the app's LLM-backed features |
 | `BENEFITS_DIGGER_GEMINI_STRUCTURED_TEMPERATURE` | `0.3` | Default temperature for JSON/structured Gemini tasks |
 | `BENEFITS_DIGGER_GEMINI_CHAT_TEMPERATURE` | `0.7` | Default temperature for conversational Gemini tasks |
+| `BENEFITS_DIGGER_GEMINI_SEARCH_GROUNDING_ENABLED` | `true` | Enables Google Search grounding on Gemini calls through the shared LLM helper |
 | `BENEFITS_DIGGER_ADMIN_KEY` | `""` | Optional key to protect admin endpoints (`X-Admin-Key` header) |
 | `BENEFITS_DIGGER_DATABASE_URL` | `sqlite:///benefits_digger.db` | SQLite database path |
 | `BENEFITS_DIGGER_AUTO_SYNC_REMOTE` | `true` | Sync official USA.gov sources on startup |
@@ -107,7 +108,7 @@ This repo now includes [render.yaml](./render.yaml) so you can deploy it as a Re
 What to set in Render:
 
 - `BENEFITS_DIGGER_GEMINI_API_KEY` as a secret in the Render dashboard
-- `BENEFITS_DIGGER_GEMINI_MODEL` defaults to `gemini-3.1-flash-lite-preview`
+- `BENEFITS_DIGGER_GEMINI_MODEL` defaults to `gemini-3-pro-preview`
 - the app will start with:
   - `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 

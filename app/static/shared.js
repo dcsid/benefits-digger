@@ -566,3 +566,528 @@ function renderResultCard(item) {
 
 // Show/hide Results nav link based on screening state on every page load
 updateResultsNavVisibility();
+
+const ZOBO_STORAGE_KEY = "bd_zobo_state";
+
+function defaultZoboState() {
+  return {
+    description: "",
+    payload: null,
+    messages: [],
+    pendingQuestionKey: null,
+    chatOpen: false,
+    autoOpenedProbeKey: null,
+    isProbeLoading: false,
+  };
+}
+
+function readPersistedZoboState() {
+  try {
+    const raw = sessionStorage.getItem(ZOBO_STORAGE_KEY);
+    if (!raw) return defaultZoboState();
+    const parsed = JSON.parse(raw);
+    return {
+      ...defaultZoboState(),
+      ...parsed,
+      messages: Array.isArray(parsed?.messages) ? parsed.messages : [],
+    };
+  } catch {
+    return defaultZoboState();
+  }
+}
+
+function persistZoboState(snapshot) {
+  const normalized = {
+    ...defaultZoboState(),
+    ...snapshot,
+    isProbeLoading: false,
+  };
+  sessionStorage.setItem(ZOBO_STORAGE_KEY, JSON.stringify(normalized));
+}
+
+window.syncZoboSharedState = function syncZoboSharedState(snapshot) {
+  persistZoboState(snapshot);
+};
+
+window.clearZoboSharedState = function clearZoboSharedState() {
+  sessionStorage.removeItem(ZOBO_STORAGE_KEY);
+};
+
+function isHomePage() {
+  return window.location.pathname === "/";
+}
+
+function countResultsByStatus(payload, status) {
+  if (!payload) return 0;
+  const all = [...(payload.federal_results || []), ...(payload.state_results || [])];
+  return all.filter((item) => item.eligibility_status === status).length;
+}
+
+async function hydrateZoboSessionContext() {
+  if (!state.sessionId) return;
+  if (!state.latestPlan) {
+    try {
+      state.latestPlan = await getJson(`/api/v1/sessions/${state.sessionId}/plan`);
+    } catch {
+      // Leave session context best-effort.
+    }
+  }
+  if (window.location.pathname === "/results" && !state.latestResults) {
+    try {
+      state.latestResults = await getJson(`/api/v1/sessions/${state.sessionId}/results`);
+    } catch {
+      // Leave session context best-effort.
+    }
+  }
+}
+
+function getZoboScopeFromContext(zoboState) {
+  return (
+    state.activeScope ||
+    zoboState.payload?.suggested_scope ||
+    state.latestPlan?.profile?.scope ||
+    "both"
+  );
+}
+
+function getZoboStateCodeFromContext(zoboState) {
+  return (
+    zoboState.payload?.applied_state_code ||
+    zoboState.payload?.current_facts?.state_code ||
+    state.latestPlan?.profile?.state_code ||
+    null
+  );
+}
+
+function getZoboCategoriesFromContext(zoboState) {
+  const merged = [
+    ...((zoboState.payload?.suggested_categories || []).map((item) => item.key)),
+    ...((state.latestPlan?.profile?.selected_categories || []).map((item) => item.key)),
+  ];
+  return [...new Set(merged.filter(Boolean))];
+}
+
+function buildZoboContextFacts(zoboState) {
+  const facts = {
+    ...(zoboState.payload?.current_facts || {}),
+    current_page: window.location.pathname,
+  };
+  if (state.sessionId) facts.active_session = true;
+  if (state.activeScope) facts.session_scope = state.activeScope;
+
+  const plan = state.latestPlan;
+  if (plan?.profile?.state_code) facts.state_code = facts.state_code || plan.profile.state_code;
+  if (plan?.overview?.answered_questions != null) facts.answered_questions = plan.overview.answered_questions;
+  if (plan?.overview?.likely_programs != null) facts.current_likely_matches = plan.overview.likely_programs;
+  if (plan?.overview?.possible_programs != null) facts.current_possible_matches = plan.overview.possible_programs;
+  if (Array.isArray(plan?.top_missing_facts) && plan.top_missing_facts.length) {
+    facts.current_top_missing_fact = plan.top_missing_facts[0].label;
+  }
+
+  const results = state.latestResults;
+  if (results) {
+    facts.current_likely_matches = countResultsByStatus(results, "likely_eligible");
+    facts.current_possible_matches = countResultsByStatus(results, "possibly_eligible");
+  }
+
+  return facts;
+}
+
+function getZoboAssistantName() {
+  return t("home.lifeAssistantName");
+}
+
+function getZoboWelcomeMessage() {
+  return state.sessionId ? t("home.lifeChatWelcomeSession") : t("home.lifeChatWelcome");
+}
+
+function getZoboStatusText(zoboState) {
+  if (!zoboState.payload) return t("home.lifeChatStatusEmpty");
+  if (zoboState.isProbeLoading) return t("home.lifeChatStatusThinking");
+  if (zoboState.payload?.next_probe) return t("home.lifeChatStatusReady");
+  return t("home.lifeChatStatusDone");
+}
+
+function getZoboPlaceholder(zoboState) {
+  const probe = zoboState.payload?.next_probe;
+  if (!probe) return t("home.lifeChatPlaceholder");
+  if (probe.input_type === "yes_no") return t("home.lifeChatPlaceholderYesNo");
+  if (probe.input_type === "state") return t("home.lifeChatPlaceholderState");
+  return t("home.lifeChatPlaceholder");
+}
+
+function buildZoboSuggestions(zoboState) {
+  const probe = zoboState.payload?.next_probe;
+  if (!probe || zoboState.isProbeLoading) return [];
+  if (probe.input_type === "yes_no" && Array.isArray(probe.options)) {
+    return probe.options.map((option) => ({
+      value: option.value,
+      label: translateDynamicText(option.label),
+    }));
+  }
+  if (probe.input_type === "state") {
+    const knownState = getZoboStateCodeFromContext(zoboState);
+    return knownState ? [{ value: knownState, label: knownState }] : [];
+  }
+  return [];
+}
+
+function normalizeZoboNavigationAction(action) {
+  if (!action || !action.href) return null;
+  if (action.href === "#start-screening-panel" || action.href === "action:start_screening") {
+    return { ...action, href: "/" };
+  }
+  return action;
+}
+
+function ensureSitewideZoboMarkup() {
+  if (isHomePage()) return null;
+  let launcher = document.querySelector("#sitewide-zobo-launcher");
+  if (launcher) {
+    return {
+      launcher,
+      popover: document.querySelector("#sitewide-zobo-popover"),
+      header: document.querySelector("#sitewide-zobo-popover .life-chat-header"),
+      closeButton: document.querySelector("#sitewide-zobo-close"),
+      messages: document.querySelector("#sitewide-zobo-messages"),
+      suggestions: document.querySelector("#sitewide-zobo-suggestions"),
+      actions: document.querySelector("#sitewide-zobo-actions"),
+      form: document.querySelector("#sitewide-zobo-form"),
+      input: document.querySelector("#sitewide-zobo-input"),
+      sendButton: document.querySelector("#sitewide-zobo-send"),
+      assistantStatus: document.querySelector("#sitewide-zobo-status"),
+    };
+  }
+
+  const host = document.querySelector("main.layout") || document.body;
+  host.insertAdjacentHTML(
+    "beforeend",
+    `
+      <button
+        type="button"
+        id="sitewide-zobo-launcher"
+        class="life-chat-launcher"
+        aria-controls="sitewide-zobo-popover"
+        aria-expanded="false"
+        aria-label="${escapeHtml(t("home.lifeChatLauncherLabel"))}"
+      >
+        <span class="life-chat-launcher-core" aria-hidden="true">
+          <span class="life-chat-bot-icon">
+            <span class="life-chat-bot-face"></span>
+          </span>
+        </span>
+      </button>
+
+      <section id="sitewide-zobo-popover" class="life-chat-popover hidden" aria-live="polite">
+        <div class="life-chat-header">
+          <div class="life-chat-assistant">
+            <div class="life-chat-avatar" aria-hidden="true">
+              <span class="life-chat-bot-icon">
+                <span class="life-chat-bot-face"></span>
+              </span>
+            </div>
+            <div class="stack life-chat-header-copy">
+              <strong>${escapeHtml(getZoboAssistantName())}</strong>
+              <p class="meta">${escapeHtml(t("home.lifeChatHint"))}</p>
+              <span id="sitewide-zobo-status" class="life-chat-status"></span>
+            </div>
+          </div>
+          <button
+            type="button"
+            id="sitewide-zobo-close"
+            class="ghost life-chat-close"
+            aria-label="${escapeHtml(t("home.lifeChatClose"))}"
+          >
+            <span class="life-chat-close-mark" aria-hidden="true">−</span>
+            <span>${escapeHtml(t("home.lifeChatMinimize"))}</span>
+          </button>
+        </div>
+        <div class="life-chatbox">
+          <div id="sitewide-zobo-messages" class="life-chat-messages"></div>
+          <div id="sitewide-zobo-suggestions" class="life-chat-suggestions hidden"></div>
+          <div id="sitewide-zobo-actions" class="life-chat-actions hidden"></div>
+          <form id="sitewide-zobo-form" class="life-chat-form">
+            <label class="sr-only" for="sitewide-zobo-input">${escapeHtml(t("home.lifeChatInputLabel"))}</label>
+            <input
+              id="sitewide-zobo-input"
+              type="text"
+              placeholder="${escapeHtml(t("home.lifeChatPlaceholder"))}"
+            />
+            <button type="submit" id="sitewide-zobo-send">${escapeHtml(t("home.lifeChatSend"))}</button>
+          </form>
+        </div>
+      </section>
+    `,
+  );
+
+  launcher = document.querySelector("#sitewide-zobo-launcher");
+  return ensureSitewideZoboMarkup();
+}
+
+function renderSitewideZobo(zoboState) {
+  const nodes = ensureSitewideZoboMarkup();
+  if (!nodes) return;
+
+  nodes.launcher.classList.toggle("has-probe", Boolean(zoboState.payload?.next_probe));
+  nodes.launcher.setAttribute("aria-expanded", zoboState.chatOpen ? "true" : "false");
+  nodes.popover.classList.toggle("hidden", !zoboState.chatOpen);
+  if (nodes.assistantStatus) nodes.assistantStatus.textContent = getZoboStatusText(zoboState);
+
+  if (!zoboState.messages.length && !zoboState.isProbeLoading) {
+    nodes.messages.innerHTML = `
+      <article class="chat-entry assistant welcome">
+        <div class="chat-entry-meta">
+          <span class="chat-avatar assistant" aria-hidden="true">ZO</span>
+          <span class="chat-author">${escapeHtml(getZoboAssistantName())}</span>
+        </div>
+        <div class="chat-bubble assistant">${escapeHtml(getZoboWelcomeMessage())}</div>
+      </article>
+    `;
+  } else {
+    nodes.messages.innerHTML = zoboState.messages
+      .map((message) => {
+        const roleClass = message.role === "assistant" ? "assistant" : "user";
+        const author = message.role === "assistant" ? getZoboAssistantName() : t("home.lifeChatUserLabel");
+        const avatarText = message.role === "assistant" ? "ZO" : ((author || "Y").trim().charAt(0).toUpperCase() || "Y");
+        return `
+          <article class="chat-entry ${roleClass}">
+            <div class="chat-entry-meta">
+              <span class="chat-avatar ${roleClass}" aria-hidden="true">${escapeHtml(avatarText)}</span>
+              <span class="chat-author">${escapeHtml(author)}</span>
+            </div>
+            <div class="chat-bubble ${roleClass}">${escapeHtml(message.content)}</div>
+          </article>
+        `;
+      })
+      .join("");
+  }
+
+  if (zoboState.isProbeLoading) {
+    nodes.messages.innerHTML += `
+      <article class="chat-entry assistant">
+        <div class="chat-entry-meta">
+          <span class="chat-avatar assistant" aria-hidden="true">ZO</span>
+          <span class="chat-author">${escapeHtml(getZoboAssistantName())}</span>
+        </div>
+        <div class="chat-bubble assistant typing" aria-label="${escapeHtml(t("home.lifeChatStatusThinking"))}">
+          <span></span><span></span><span></span>
+        </div>
+      </article>
+    `;
+  }
+  nodes.messages.scrollTop = nodes.messages.scrollHeight;
+
+  const suggestions = buildZoboSuggestions(zoboState);
+  if (suggestions.length) {
+    nodes.suggestions.classList.remove("hidden");
+    nodes.suggestions.innerHTML = `
+      <span class="life-chat-suggestions-label">${escapeHtml(t("home.lifeChatQuickReplies"))}</span>
+      ${suggestions
+        .map(
+          (suggestion) => `
+            <button
+              type="button"
+              class="life-chat-suggestion"
+              data-sitewide-zobo-suggestion="${escapeHtml(suggestion.value)}"
+            >${escapeHtml(suggestion.label)}</button>
+          `,
+        )
+        .join("")}
+    `;
+  } else {
+    nodes.suggestions.classList.add("hidden");
+    nodes.suggestions.innerHTML = "";
+  }
+
+  const actions = (zoboState.payload?.navigation_actions || [])
+    .map(normalizeZoboNavigationAction)
+    .filter(Boolean);
+  if (actions.length) {
+    nodes.actions.classList.remove("hidden");
+    nodes.actions.innerHTML = `
+      <span class="life-chat-suggestions-label">${escapeHtml(t("home.lifeChatNavigate"))}</span>
+      <div class="life-chat-action-list">
+        ${actions
+          .map(
+            (action) => `
+              <a class="life-chat-action-link" href="${escapeHtml(action.href)}">${escapeHtml(translateDynamicText(action.label || action.key || action.href))}</a>
+            `,
+          )
+          .join("")}
+      </div>
+    `;
+  } else {
+    nodes.actions.classList.add("hidden");
+    nodes.actions.innerHTML = "";
+  }
+
+  nodes.input.placeholder = getZoboPlaceholder(zoboState);
+  nodes.input.disabled = zoboState.isProbeLoading;
+  setBusyButtonText(nodes.sendButton, zoboState.isProbeLoading, t("home.lifeChatSending"), t("home.lifeChatSend"));
+  nodes.sendButton.disabled = zoboState.isProbeLoading;
+
+  const probeKey = zoboState.payload?.next_probe?.key || null;
+  if (probeKey && zoboState.autoOpenedProbeKey !== probeKey) {
+    zoboState.autoOpenedProbeKey = probeKey;
+    zoboState.chatOpen = true;
+    requestAnimationFrame(() => nodes.input.focus());
+  }
+
+  persistZoboState(zoboState);
+}
+
+function initializeSitewideZobo() {
+  if (isHomePage()) return;
+  const nodes = ensureSitewideZoboMarkup();
+  if (!nodes || nodes.popover.dataset.initialized === "true") {
+    if (nodes) renderSitewideZobo(readPersistedZoboState());
+    return;
+  }
+  nodes.popover.dataset.initialized = "true";
+
+  const zoboState = readPersistedZoboState();
+  renderSitewideZobo(zoboState);
+
+  async function interpret(message) {
+    const trimmed = (message || "").trim();
+    if (!trimmed) {
+      setStatus(t("home.lifeDescriptionRequired"));
+      return;
+    }
+    try {
+      zoboState.description = trimmed;
+      zoboState.messages = [{ role: "user", content: trimmed }];
+      zoboState.isProbeLoading = true;
+      zoboState.chatOpen = true;
+      renderSitewideZobo(zoboState);
+      await hydrateZoboSessionContext();
+      const payload = await getJson("/api/v1/intake/interpret", {
+        method: "POST",
+        body: JSON.stringify({
+          description: trimmed,
+          scope: getZoboScopeFromContext(zoboState),
+          state_code: getZoboStateCodeFromContext(zoboState),
+          categories: getZoboCategoriesFromContext(zoboState),
+          current_facts: buildZoboContextFacts(zoboState),
+          use_llm: true,
+        }),
+      });
+      if (payload.chat_reply) {
+        zoboState.messages.push({ role: "assistant", content: payload.chat_reply });
+      }
+      zoboState.payload = payload;
+      zoboState.pendingQuestionKey = payload?.next_probe?.key || null;
+      zoboState.isProbeLoading = false;
+      renderSitewideZobo(zoboState);
+      setStatus(t("home.lifeAnalyzed"));
+    } catch (error) {
+      zoboState.isProbeLoading = false;
+      renderSitewideZobo(zoboState);
+      setStatus(t("home.lifeInterpretError", { error: error.message }));
+    } finally {
+      nodes.input.value = "";
+    }
+  }
+
+  async function probe(message) {
+    const trimmed = (message || "").trim();
+    if (!trimmed) return;
+    if (!zoboState.payload) {
+      await interpret(trimmed);
+      return;
+    }
+    try {
+      zoboState.messages.push({ role: "user", content: trimmed });
+      zoboState.isProbeLoading = true;
+      renderSitewideZobo(zoboState);
+      await hydrateZoboSessionContext();
+      const payload = await getJson("/api/v1/intake/probe", {
+        method: "POST",
+        body: JSON.stringify({
+          description: zoboState.description,
+          scope: getZoboScopeFromContext(zoboState),
+          state_code: getZoboStateCodeFromContext(zoboState),
+          categories: getZoboCategoriesFromContext(zoboState),
+          current_facts: buildZoboContextFacts(zoboState),
+          pending_question_key: zoboState.pendingQuestionKey,
+          messages: zoboState.messages,
+          use_llm: true,
+        }),
+      });
+      if (payload.chat_reply) {
+        zoboState.messages.push({ role: "assistant", content: payload.chat_reply });
+      }
+      zoboState.payload = payload;
+      zoboState.pendingQuestionKey = payload?.next_probe?.key || null;
+      zoboState.isProbeLoading = false;
+      renderSitewideZobo(zoboState);
+      setStatus(t("home.lifeProbeUpdated"));
+    } catch (error) {
+      zoboState.isProbeLoading = false;
+      renderSitewideZobo(zoboState);
+      setStatus(t("home.lifeProbeError", { error: error.message }));
+    } finally {
+      nodes.input.value = "";
+      if (zoboState.chatOpen) {
+        requestAnimationFrame(() => nodes.input.focus());
+      }
+    }
+  }
+
+  nodes.form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (zoboState.isProbeLoading) return;
+    await probe(nodes.input.value || "");
+  });
+
+  nodes.suggestions.addEventListener("click", async (event) => {
+    const target = event.target.closest("[data-sitewide-zobo-suggestion]");
+    if (!target || zoboState.isProbeLoading) return;
+    await probe(target.dataset.sitewideZoboSuggestion || "");
+  });
+
+  nodes.launcher.addEventListener("click", () => {
+    zoboState.chatOpen = !zoboState.chatOpen;
+    renderSitewideZobo(zoboState);
+    if (zoboState.chatOpen) {
+      requestAnimationFrame(() => nodes.input.focus());
+    }
+  });
+
+  nodes.closeButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    zoboState.chatOpen = false;
+    renderSitewideZobo(zoboState);
+  });
+
+  nodes.header.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest("#sitewide-zobo-close")) return;
+    zoboState.chatOpen = false;
+    renderSitewideZobo(zoboState);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && zoboState.chatOpen) {
+      zoboState.chatOpen = false;
+      renderSitewideZobo(zoboState);
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!zoboState.chatOpen) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest("#sitewide-zobo-popover") || target.closest("#sitewide-zobo-launcher")) return;
+    zoboState.chatOpen = false;
+    renderSitewideZobo(zoboState);
+  });
+
+  document.addEventListener("localechange", () => {
+    renderSitewideZobo(zoboState);
+  });
+}
+
+initializeSitewideZobo();

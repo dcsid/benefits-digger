@@ -23,7 +23,7 @@ def build_gemini_config(
     response_mime_type: Optional[str] = None,
     temperature: Optional[float] = None,
     structured: bool = True,
-) -> dict[str, Any]:
+) -> Any:
     settings = get_settings()
     resolved_temperature = temperature
     if resolved_temperature is None:
@@ -33,9 +33,22 @@ def build_gemini_config(
             else settings.gemini_chat_temperature
         )
 
-    config: dict[str, Any] = {
-        "temperature": resolved_temperature,
-    }
-    if response_mime_type:
-        config["response_mime_type"] = response_mime_type
-    return config
+    try:
+        from google.genai import types
+    except Exception:
+        config: dict[str, Any] = {"temperature": resolved_temperature}
+        if response_mime_type:
+            config["response_mime_type"] = response_mime_type
+        if settings.gemini_search_grounding_enabled:
+            config["tools"] = [{"google_search": {}}]
+        return config
+
+    tools = []
+    if settings.gemini_search_grounding_enabled:
+        tools.append(types.Tool(google_search=types.GoogleSearch()))
+
+    return types.GenerateContentConfig(
+        temperature=resolved_temperature,
+        response_mime_type=response_mime_type,
+        tools=tools or None,
+    )
