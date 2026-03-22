@@ -28,6 +28,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from app.main import app  # noqa: E402
 from app.config import get_settings  # noqa: E402
+from app.llm import build_gemini_config, get_gemini_model  # noqa: E402
 
 def _default_answer(question: dict) -> object:
     """Return a safe default for questions we can't answer from user data."""
@@ -129,12 +130,13 @@ Return a JSON object with this exact structure:
 
     try:
         response = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=get_gemini_model(),
             contents=prompt,
-            config={
-                "response_mime_type": "application/json",
-                "temperature": 0.1,
-            },
+            config=build_gemini_config(
+                response_mime_type="application/json",
+                temperature=0.2,
+                structured=True,
+            ),
         )
         return json.loads(response.text.strip())
     except Exception as exc:

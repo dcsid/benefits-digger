@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.catalog import hash_content, slugify
 from app.config import get_settings
 from app.gov_crawl import category_keyword_hints, crawl_official_site, filter_relevant_pages
+from app.llm import build_gemini_config, get_gemini_client, get_gemini_model
 from app.models import (
     AmountRule,
     EligibilityRule,
@@ -167,17 +168,16 @@ IMPORTANT:
 
 def _call_gemini(prompt: str) -> list[dict[str, Any]]:
     """Call Gemini API and return parsed JSON."""
-    from google import genai
-
-    client = genai.Client(api_key=settings.gemini_api_key)
+    client = get_gemini_client()
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model=get_gemini_model(),
         contents=prompt,
-        config={
-            "response_mime_type": "application/json",
-            "temperature": 0.2,
-        },
+        config=build_gemini_config(
+            response_mime_type="application/json",
+            temperature=0.35,
+            structured=True,
+        ),
     )
 
     text = response.text.strip()
@@ -245,6 +245,7 @@ Rules:
 - Prefer concluding once the user has given a usable situation plus at least one concrete follow-up detail, instead of continuing to fish for more.
 - Keep the chat reply concise, practical, and conversational.
 - Sound like a calm personal assistant, not a classifier or rules engine.
+- Be flexible about tone and wording so the reply feels natural instead of templated.
 - Do not start the chat reply with phrases like "This sounds most connected to".
 - Do not repeat the summary verbatim in the chat reply.
 - If the user's message is only a greeting, vague opener, or too thin to classify confidently, respond warmly, invite them to describe what is going on in a sentence or two, and set next_probe_key to null.
@@ -275,14 +276,15 @@ Original user situation:
 """
 
     try:
-        client = genai.Client(api_key=settings.gemini_api_key)
+        client = get_gemini_client()
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=get_gemini_model(),
             contents=prompt,
-            config={
-                "response_mime_type": "application/json",
-                "temperature": 0.25,
-            },
+            config=build_gemini_config(
+                response_mime_type="application/json",
+                temperature=0.8,
+                structured=False,
+            ),
         )
         payload = json.loads(response.text.strip())
         if not isinstance(payload, dict):

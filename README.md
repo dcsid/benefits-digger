@@ -91,11 +91,30 @@ Configuration is managed via environment variables (or a `.env` file):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BENEFITS_DIGGER_GEMINI_API_KEY` | `""` | Google Gemini API key for AI-powered state program generation |
+| `BENEFITS_DIGGER_GEMINI_MODEL` | `gemini-3.1-flash-lite-preview` | Gemini model used across the app's LLM-backed features |
+| `BENEFITS_DIGGER_GEMINI_STRUCTURED_TEMPERATURE` | `0.3` | Default temperature for JSON/structured Gemini tasks |
+| `BENEFITS_DIGGER_GEMINI_CHAT_TEMPERATURE` | `0.7` | Default temperature for conversational Gemini tasks |
 | `BENEFITS_DIGGER_ADMIN_KEY` | `""` | Optional key to protect admin endpoints (`X-Admin-Key` header) |
 | `BENEFITS_DIGGER_DATABASE_URL` | `sqlite:///benefits_digger.db` | SQLite database path |
 | `BENEFITS_DIGGER_AUTO_SYNC_REMOTE` | `true` | Sync official USA.gov sources on startup |
 | `BENEFITS_DIGGER_MAX_RESULTS_PER_SECTION` | `12` | Max results per federal/state section |
 | `BENEFITS_DIGGER_REQUEST_TIMEOUT_SECONDS` | `20.0` | HTTP request timeout for remote fetches |
+
+## Render Deployment
+
+This repo now includes [render.yaml](./render.yaml) so you can deploy it as a Render Blueprint.
+
+What to set in Render:
+
+- `BENEFITS_DIGGER_GEMINI_API_KEY` as a secret in the Render dashboard
+- `BENEFITS_DIGGER_GEMINI_MODEL` defaults to `gemini-3.1-flash-lite-preview`
+- the app will start with:
+  - `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+Important note:
+
+- the app currently uses SQLite by default, so it will run on Render, but data will be ephemeral unless you later attach persistent storage or move to Postgres
+- your local `.env` is intentionally not committed; use `.env.example` locally and Render environment variables in the cloud
 
 ## Pages
 

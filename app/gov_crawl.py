@@ -11,6 +11,7 @@ import httpx
 
 from app.catalog import hash_content, is_official_government_url, strip_html
 from app.config import get_settings
+from app.llm import build_gemini_config, get_gemini_client, get_gemini_model
 
 
 logger = logging.getLogger(__name__)
@@ -232,9 +233,7 @@ def filter_relevant_pages(
         return heuristic_ranked[:max_results]
 
     try:
-        from google import genai
-
-        client = genai.Client(api_key=settings.gemini_api_key)
+        client = get_gemini_client()
         prompt = f"""You are filtering a crawl of official government pages for a benefits product.
 
 Return ONLY JSON with this shape:
@@ -252,18 +251,20 @@ Context:
 Rules:
 - Only pick from the provided URLs.
 - Prefer pages that explain eligibility, applications, benefits, or official program details.
+- FAQ, forms, office-locator, and document pages are okay if they materially help someone understand or apply for the benefit.
 - Avoid generic navigation, press, careers, or unrelated services pages.
 
 Candidates:
 {json.dumps([{"url": page["url"], "title": page["title"], "excerpt": page["excerpt"]} for page in pages], ensure_ascii=True)}
 """
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=get_gemini_model(),
             contents=prompt,
-            config={
-                "response_mime_type": "application/json",
-                "temperature": 0.1,
-            },
+            config=build_gemini_config(
+                response_mime_type="application/json",
+                temperature=0.25,
+                structured=True,
+            ),
         )
         payload = json.loads(response.text.strip())
         selected_urls = set(payload.get("selected_urls", []))
