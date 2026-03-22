@@ -237,14 +237,14 @@ def is_redundant_state_residency_rule(
 # Question prerequisite gating
 # ---------------------------------------------------------------------------
 # Gates follow-up questions behind a required answer to a prior question.
-# Exact key → (gate_key, required_value)
+# Exact key -> (gate_key, required_value)
 QUESTION_PREREQUISITE_KEYS: dict[str, tuple[str, str]] = {
     "applicant_relationship_to_the_deceased": ("applicant_dolo", "Yes"),
     "applicant_care_for_child": ("applicant_dolo", "Yes"),
     "applicant_child_spouse_SS": ("applicant_dolo", "Yes"),
 }
 
-# Prefix → (gate_key, required_value)
+# Prefix -> (gate_key, required_value)
 QUESTION_PREREQUISITE_PREFIXES: list[tuple[str, str, str]] = [
     ("deceased_", "applicant_dolo", "Yes"),
 ]
@@ -258,9 +258,8 @@ def is_gated_question(question_key: str, answers: dict[str, Any]) -> bool:
         if answers.get(gate_key) != required_value:
             return True
     for prefix, gate_key, required_value in QUESTION_PREREQUISITE_PREFIXES:
-        if question_key.startswith(prefix):
-            if answers.get(gate_key) != required_value:
-                return True
+        if question_key.startswith(prefix) and answers.get(gate_key) != required_value:
+            return True
     return False
 
 
