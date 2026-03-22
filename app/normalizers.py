@@ -43,6 +43,16 @@ def _yes_if_gte_12(value: Any, question_key: str) -> str:
     return "No"
 
 
+def _yes_if_non_empty(value: Any, question_key: str) -> str:
+    """Return 'Yes' if the free-text answer contains meaningful content."""
+    if not value:
+        return "No"
+    text = str(value).strip().lower()
+    if text in ("", "no", "none", "n/a", "na", "no.", "none."):
+        return "No"
+    return "Yes"
+
+
 def _yes_if_any_selected(value: Any, question_key: str) -> str:
     if isinstance(value, list):
         meaningful = [v for v in value if v != "none"]
@@ -59,6 +69,7 @@ NORMALIZER_REGISTRY: dict[str, NormalizerFunc] = {
     "yes_if_below_fpl": _yes_if_below_fpl,
     "yes_if_gte_12": _yes_if_gte_12,
     "yes_if_any_selected": _yes_if_any_selected,
+    "yes_if_non_empty": _yes_if_non_empty,
 }
 
 

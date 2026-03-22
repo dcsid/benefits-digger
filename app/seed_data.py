@@ -383,11 +383,11 @@ QUESTION_VARIANTS = [
     {
         "question_key": "applicant_served_in_active_military",
         "depth_tier": "detailed",
-        "prompt": "Did you serve in the active military, naval, or air service?",
+        "prompt": "Describe your military service (branch, years, and duty status).",
         "hint": "VA benefits require active duty service. Reserve/National Guard service may qualify if activated under federal orders (38 U.S.C. § 101(2)).",
-        "input_type": "radio",
-        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
-        "normalizer": None,
+        "input_type": "text",
+        "options": None,
+        "normalizer": "yes_if_non_empty",
     },
     # ── applicant_service_disability ──────────────────────────────────
     {
@@ -402,11 +402,11 @@ QUESTION_VARIANTS = [
     {
         "question_key": "applicant_service_disability",
         "depth_tier": "detailed",
-        "prompt": "Was your disability caused or made worse by your active-duty military service?",
+        "prompt": "Describe how your disability is connected to your military service.",
         "hint": "VA disability compensation requires a service-connected condition with a disability rating of at least 10% (38 U.S.C. § 1110).",
-        "input_type": "radio",
-        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
-        "normalizer": None,
+        "input_type": "text",
+        "options": None,
+        "normalizer": "yes_if_non_empty",
     },
     # ── applicant_dolo (death of loved one) ───────────────────────────
     {
@@ -421,10 +421,67 @@ QUESTION_VARIANTS = [
     {
         "question_key": "applicant_dolo",
         "depth_tier": "detailed",
-        "prompt": "Did you recently experience the death of an immediate family member?",
+        "prompt": "Please describe your relationship to the deceased family member.",
         "hint": "Survivor benefits eligibility depends on your relationship to the deceased and their work history (42 U.S.C. § 402).",
+        "input_type": "text",
+        "options": None,
+        "normalizer": "yes_if_non_empty",
+    },
+    # ── applicant_paid_into_SS ──────────────────────────────────────
+    {
+        "question_key": "applicant_paid_into_SS",
+        "depth_tier": "simple",
+        "prompt": "Have you ever worked and paid into Social Security?",
+        "hint": None,
         "input_type": "radio",
         "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
         "normalizer": None,
+    },
+    {
+        "question_key": "applicant_paid_into_SS",
+        "depth_tier": "detailed",
+        "prompt": "Describe your work history and Social Security tax contributions.",
+        "hint": "Most jobs in the U.S. withhold Social Security taxes (FICA). You generally need 40 work credits (about 10 years) to qualify for retirement benefits.",
+        "input_type": "text",
+        "options": None,
+        "normalizer": "yes_if_non_empty",
+    },
+    # ── deceased_died_of_COVID ──────────────────────────────────────
+    {
+        "question_key": "deceased_died_of_COVID",
+        "depth_tier": "simple",
+        "prompt": "Was the person's death COVID-19 related?",
+        "hint": None,
+        "input_type": "radio",
+        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
+        "normalizer": None,
+    },
+    {
+        "question_key": "deceased_died_of_COVID",
+        "depth_tier": "detailed",
+        "prompt": "What was the cause of death as listed on the death certificate?",
+        "hint": "FEMA funeral assistance requires that the death certificate attribute the death to COVID-19.",
+        "input_type": "text",
+        "options": None,
+        "normalizer": "yes_if_non_empty",
+    },
+    # ── deceased_death_location_is_US ───────────────────────────────
+    {
+        "question_key": "deceased_death_location_is_US",
+        "depth_tier": "simple",
+        "prompt": "Did the person die in the U.S.?",
+        "hint": "Including Puerto Rico and U.S. territories.",
+        "input_type": "radio",
+        "options": [{"label": "Yes", "value": "Yes"}, {"label": "No", "value": "No"}],
+        "normalizer": None,
+    },
+    {
+        "question_key": "deceased_death_location_is_US",
+        "depth_tier": "detailed",
+        "prompt": "In which U.S. state or territory did the person pass away?",
+        "hint": "Include Puerto Rico and other U.S. territories. If the person did not die in the U.S., enter 'N/A'.",
+        "input_type": "text",
+        "options": None,
+        "normalizer": "yes_if_non_empty",
     },
 ]
