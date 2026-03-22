@@ -645,13 +645,6 @@ fieldset {
   scrollbar-gutter: stable;
   padding-right: 10px;
   align-content: start;
-  scroll-snap-type: y mandatory;
-}
-
-#federal-results > .card,
-#state-results > .card {
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
 }
 
 #federal-results::-webkit-scrollbar,
@@ -675,6 +668,11 @@ fieldset {
 #state-results {
   scrollbar-width: auto;
   scrollbar-color: rgba(11, 110, 79, 0.45) rgba(31, 42, 36, 0.08);
+}
+
+.result-scroll-spacer {
+  width: 100%;
+  pointer-events: none;
 }
 
 .planner-grid {
