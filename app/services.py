@@ -233,6 +233,37 @@ def is_redundant_state_residency_rule(
     )
 
 
+# ---------------------------------------------------------------------------
+# Question prerequisite gating
+# ---------------------------------------------------------------------------
+# Gates follow-up questions behind a required answer to a prior question.
+# Exact key → (gate_key, required_value)
+QUESTION_PREREQUISITE_KEYS: dict[str, tuple[str, str]] = {
+    "applicant_relationship_to_the_deceased": ("applicant_dolo", "Yes"),
+    "applicant_care_for_child": ("applicant_dolo", "Yes"),
+    "applicant_child_spouse_SS": ("applicant_dolo", "Yes"),
+}
+
+# Prefix → (gate_key, required_value)
+QUESTION_PREREQUISITE_PREFIXES: list[tuple[str, str, str]] = [
+    ("deceased_", "applicant_dolo", "Yes"),
+]
+
+
+def is_gated_question(question_key: str, answers: dict[str, Any]) -> bool:
+    """Return True if this question's prerequisite has not been satisfied."""
+    gate = QUESTION_PREREQUISITE_KEYS.get(question_key)
+    if gate:
+        gate_key, required_value = gate
+        if answers.get(gate_key) != required_value:
+            return True
+    for prefix, gate_key, required_value in QUESTION_PREREQUISITE_PREFIXES:
+        if question_key.startswith(prefix):
+            if answers.get(gate_key) != required_value:
+                return True
+    return False
+
+
 CATEGORY_FILTER_MAP = {
     "children_families": {"children_families", "family"},
     "death": {"death", "survivor", "funeral_assistance"},
@@ -1359,6 +1390,8 @@ def score_unanswered_questions(
                 rule=rule,
                 question=question,
             ):
+                continue
+            if is_gated_question(rule.question_key, answers):
                 continue
             if enforce_depth_unlocks and not question_is_unlocked(question, answers_count, policy):
                 continue
