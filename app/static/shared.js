@@ -82,18 +82,18 @@ function setAdminKey(key) {
 }
 
 const categoryDefinitions = [
-  { value: "children_families", label: "Children and families" },
-  { value: "death", label: "Death" },
-  { value: "disabilities", label: "Disabilities" },
-  { value: "disasters", label: "Disasters" },
-  { value: "education", label: "Education" },
-  { value: "food", label: "Food" },
-  { value: "health", label: "Health" },
-  { value: "housing_utilities", label: "Housing and utilities" },
-  { value: "jobs_unemployment", label: "Jobs and unemployment" },
-  { value: "military_veterans", label: "Military and veterans" },
-  { value: "retirement_seniors", label: "Retirement and seniors" },
-  { value: "welfare_cash_assistance", label: "Welfare and cash assistance" },
+  { value: "children_families", label: "Children and families", icon: "👨‍👩‍👧" },
+  { value: "death", label: "Death", icon: "🕊️" },
+  { value: "disabilities", label: "Disabilities", icon: "♿" },
+  { value: "disasters", label: "Disasters", icon: "🌪️" },
+  { value: "education", label: "Education", icon: "🎓" },
+  { value: "food", label: "Food", icon: "🍎" },
+  { value: "health", label: "Health", icon: "🩺" },
+  { value: "housing_utilities", label: "Housing and utilities", icon: "🏠" },
+  { value: "jobs_unemployment", label: "Jobs and unemployment", icon: "💼" },
+  { value: "military_veterans", label: "Military and veterans", icon: "🎖️" },
+  { value: "retirement_seniors", label: "Retirement and seniors", icon: "👵" },
+  { value: "welfare_cash_assistance", label: "Welfare and cash assistance", icon: "💵" },
 ];
 
 const depthDescriptions = [
