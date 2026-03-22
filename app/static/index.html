@@ -103,24 +103,48 @@
         class="life-chat-launcher hidden"
         aria-controls="life-chat-popover"
         aria-expanded="false"
+        aria-label="Open Benefits Guide assistant"
+        data-i18n="home.lifeChatLauncherLabel"
+        data-i18n-attr="aria-label"
       >
-        <span class="life-chat-launcher-core">AI</span>
+        <span class="life-chat-launcher-core" aria-hidden="true">
+          <span class="life-chat-bot-icon">
+            <span class="life-chat-bot-face"></span>
+          </span>
+        </span>
       </button>
 
       <section id="life-chat-popover" class="life-chat-popover hidden" aria-live="polite">
-        <div class="row spread">
-          <div>
-            <strong data-i18n="home.lifeChatTitle">Probe for more detail</strong>
-            <p class="meta" data-i18n="home.lifeChatHint">
-              After the first intake pass, this small chatbox asks one short follow-up at a time and updates the structured facts above.
-            </p>
+        <div class="life-chat-header">
+          <div class="life-chat-assistant">
+            <div class="life-chat-avatar" aria-hidden="true">
+              <span class="life-chat-bot-icon">
+                <span class="life-chat-bot-face"></span>
+              </span>
+            </div>
+            <div class="stack life-chat-header-copy">
+              <strong data-i18n="home.lifeAssistantName">Benefits Guide</strong>
+              <p class="meta" data-i18n="home.lifeChatHint">
+                I ask one short follow-up at a time and keep the structured facts above in sync for you.
+              </p>
+              <span id="life-chat-assistant-status" class="life-chat-status"></span>
+            </div>
           </div>
-          <button type="button" id="life-chat-close" class="ghost life-chat-close" aria-label="Close">×</button>
+          <button
+            type="button"
+            id="life-chat-close"
+            class="ghost life-chat-close"
+            aria-label="Close assistant"
+            data-i18n="home.lifeChatClose"
+            data-i18n-attr="aria-label"
+          >×</button>
         </div>
         <div id="life-chat-empty" class="empty" data-i18n="home.lifeChatEmpty">Run the intake first to unlock the follow-up chat.</div>
         <div id="life-chatbox" class="life-chatbox hidden">
           <div id="life-chat-messages" class="life-chat-messages"></div>
-          <form id="life-chat-form" class="stack">
+          <div id="life-chat-suggestions" class="life-chat-suggestions hidden"></div>
+          <form id="life-chat-form" class="life-chat-form">
+            <label class="sr-only" for="life-chat-input" data-i18n="home.lifeChatInputLabel">Reply to the assistant</label>
             <input
               id="life-chat-input"
               type="text"

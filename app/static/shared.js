@@ -46,10 +46,13 @@ function applyI18n() {
     const key = el.dataset.i18n;
     const translated = t(key);
     if (translated !== key) {
-      if (el.dataset.i18nAttr === "placeholder") {
-        el.placeholder = translated;
-      } else if (el.dataset.i18nAttr === "title") {
-        el.title = translated;
+      if (el.dataset.i18nAttr) {
+        el.setAttribute(el.dataset.i18nAttr, translated);
+        if (el.dataset.i18nAttr === "placeholder") {
+          el.placeholder = translated;
+        } else if (el.dataset.i18nAttr === "title") {
+          el.title = translated;
+        }
       } else {
         el.innerHTML = translated;
       }
