@@ -228,6 +228,11 @@
 
   "card.confidence": "Confianza",
   "card.clickExpand": "(clic para expandir)",
+  "card.eligibilityCriteria": "Criterios de elegibilidad",
+  "card.criteriaMet": "cumplidos",
+  "card.met": "cumplidos",
+  "card.notMet": "no cumplidos",
+  "card.unanswered": "sin respuesta",
   "card.amount": "Monto",
   "card.amountEstimated": " (estimado)",
   "card.whyMatched": "Por que coincidio",

@@ -651,6 +651,7 @@ startForm.addEventListener("submit", async (event) => {
 
     const hasState = scopeSelect.value !== "federal" && stateSelect.value;
     setStatus(hasState ? t("home.creatingSessionState") : t("home.creatingSession"));
+    showLoadingOverlay(hasState ? t("home.creatingSessionState") : t("home.creatingSession"));
     const payload = {
       scope: scopeSelect.value,
       state_code: stateSelect.value || null,
@@ -683,6 +684,7 @@ startForm.addEventListener("submit", async (event) => {
   } catch (error) {
     setStatus(t("home.sessionError", { error: error.message }));
   } finally {
+    hideLoadingOverlay();
     if (submitBtn) {
       setLoading(submitBtn, false);
       setBusyButtonText(submitBtn, false, t("home.searching"), t("home.apply"));

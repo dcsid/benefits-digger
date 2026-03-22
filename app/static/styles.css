@@ -1204,6 +1204,11 @@ fieldset {
   padding-left: 1rem;
 }
 
+.source-list li + li,
+.reason-list li + li {
+  margin-top: 0.25rem;
+}
+
 .mini-card h4,
 .mini-card h5 {
   margin: 0 0 0.45rem;
@@ -1603,4 +1608,52 @@ input[type="range"].control-slider::-moz-range-thumb {
 .badge-doc.recommended {
   background: #d8f4e4;
   color: #11553b;
+}
+
+.criteria-detail {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+  margin-top: 0.35rem;
+}
+
+.criteria-pass { color: #0b6e4f; }
+.criteria-fail { color: #a33; }
+.criteria-unknown { color: var(--muted); }
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 1000;
+}
+
+.loading-overlay.hidden {
+  display: none;
+}
+
+.loading-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 2rem 2.5rem;
+  text-align: center;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  max-width: 320px;
+}
+
+.loading-modal .spinner {
+  width: 2em;
+  height: 2em;
+  border-width: 3px;
+  margin: 0 auto 1rem;
+  display: block;
+}
+
+.loading-modal p {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.05rem;
 }

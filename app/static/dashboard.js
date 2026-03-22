@@ -185,7 +185,6 @@ function renderPlan(plan) {
 
 async function loadPlan() {
   if (!state.sessionId) {
-    planEmpty.innerHTML = t("dashboard.noSessionLink");
     renderPlan(null);
     return;
   }
@@ -245,7 +244,6 @@ document.addEventListener("localechange", () => {
   if (state.latestPlan) {
     renderPlan(state.latestPlan);
   } else if (!state.sessionId) {
-    planEmpty.innerHTML = t("dashboard.noSessionLink");
     renderPlan(null);
   }
 });

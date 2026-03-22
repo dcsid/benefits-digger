@@ -426,6 +426,18 @@ function setStatus(message) {
   if (node) node.textContent = message;
 }
 
+function showLoadingOverlay(message) {
+  const overlay = document.getElementById("loading-overlay");
+  const msg = document.getElementById("loading-message");
+  if (msg) msg.textContent = message || "Loading...";
+  if (overlay) overlay.classList.remove("hidden");
+}
+
+function hideLoadingOverlay() {
+  const overlay = document.getElementById("loading-overlay");
+  if (overlay) overlay.classList.add("hidden");
+}
+
 function scrollToTopOf(node) {
   if (!node) return;
   const top = node.getBoundingClientRect().top + window.scrollY - 8;
