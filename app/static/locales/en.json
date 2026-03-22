@@ -81,6 +81,8 @@
   "results.print": "Print",
   "results.redoScreening": "Redo Screening",
   "results.downloadPdf": "Download PDF",
+  "results.scrollUp": "Scroll up",
+  "results.scrollDown": "Scroll down",
   "results.generatingPdf": "Generating...",
   "results.noSession": "No active session. <a href=\"/\">Start a screening</a> first.",
   "results.federalTitle": "Federal Results",

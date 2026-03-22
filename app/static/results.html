@@ -36,12 +36,64 @@
         </div>
         <div id="results-grid" class="results-grid">
           <div id="federal-results-column">
-            <h3 data-i18n="results.federalTitle">Federal Results</h3>
+            <div class="result-column-head">
+              <h3 data-i18n="results.federalTitle">Federal Results</h3>
+            </div>
+            <button
+              type="button"
+              class="result-nav-btn result-nav-btn--top"
+              data-scroll-target="#federal-results"
+              data-scroll-direction="up"
+              data-i18n="results.scrollUp"
+              data-i18n-attr="title"
+              title="Scroll up"
+              aria-label="Scroll up"
+            >
+              ↑
+            </button>
             <div id="federal-results" class="result-list empty" data-i18n="results.noFederal">No federal results yet.</div>
+            <button
+              type="button"
+              class="result-nav-btn result-nav-btn--bottom"
+              data-scroll-target="#federal-results"
+              data-scroll-direction="down"
+              data-i18n="results.scrollDown"
+              data-i18n-attr="title"
+              title="Scroll down"
+              aria-label="Scroll down"
+            >
+              ↓
+            </button>
           </div>
           <div id="state-results-column">
-            <h3 data-i18n="results.stateTitle">State Results</h3>
+            <div class="result-column-head">
+              <h3 data-i18n="results.stateTitle">State Results</h3>
+            </div>
+            <button
+              type="button"
+              class="result-nav-btn result-nav-btn--top"
+              data-scroll-target="#state-results"
+              data-scroll-direction="up"
+              data-i18n="results.scrollUp"
+              data-i18n-attr="title"
+              title="Scroll up"
+              aria-label="Scroll up"
+            >
+              ↑
+            </button>
             <div id="state-results" class="result-list empty" data-i18n="results.noState">No state results yet.</div>
+            <button
+              type="button"
+              class="result-nav-btn result-nav-btn--bottom"
+              data-scroll-target="#state-results"
+              data-scroll-direction="down"
+              data-i18n="results.scrollDown"
+              data-i18n-attr="title"
+              title="Scroll down"
+              aria-label="Scroll down"
+            >
+              ↓
+            </button>
           </div>
         </div>
       </section>

@@ -81,6 +81,8 @@
   "results.print": "Imprimir",
   "results.redoScreening": "Reiniciar evaluacion",
   "results.downloadPdf": "Descargar PDF",
+  "results.scrollUp": "Desplazar hacia arriba",
+  "results.scrollDown": "Desplazar hacia abajo",
   "results.generatingPdf": "Generando...",
   "results.noSession": "No hay sesion activa. <a href=\"/\">Inicie una evaluacion</a> primero.",
   "results.federalTitle": "Resultados federales",

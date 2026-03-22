@@ -6,6 +6,34 @@ const resultsGrid = document.querySelector("#results-grid");
 const noSession = document.querySelector("#no-session");
 const redoScreeningButton = document.querySelector("#redo-screening");
 
+function scrollToResultCard(container, direction) {
+  if (!container) return;
+
+  const cards = [...container.querySelectorAll(":scope > .card")];
+  if (!cards.length) {
+    container.scrollBy({ top: direction === "down" ? 180 : -180, behavior: "smooth" });
+    return;
+  }
+
+  const containerTop = container.getBoundingClientRect().top;
+  const currentIndex = cards.findIndex((card) => {
+    const rect = card.getBoundingClientRect();
+    return rect.top <= containerTop + 12 && rect.bottom > containerTop + 12;
+  });
+
+  const normalizedIndex = currentIndex === -1
+    ? (container.scrollTop <= 2 ? 0 : cards.length - 1)
+    : currentIndex;
+
+  const targetIndex = direction === "down"
+    ? Math.min(cards.length - 1, normalizedIndex + 1)
+    : Math.max(0, normalizedIndex - 1);
+
+  const targetRect = cards[targetIndex].getBoundingClientRect();
+  const targetTop = container.scrollTop + (targetRect.top - containerTop);
+  container.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+}
+
 function redoScreening() {
   setSessionId(null);
   setActiveScope(null);
@@ -92,6 +120,15 @@ document.querySelector("#download-pdf").addEventListener("click", () => {
 });
 
   redoScreeningButton?.addEventListener("click", redoScreening);
+
+  document.querySelectorAll(".result-nav-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      const targetSelector = button.dataset.scrollTarget;
+      const direction = button.dataset.scrollDirection === "up" ? "up" : "down";
+      const container = targetSelector ? document.querySelector(targetSelector) : null;
+      scrollToResultCard(container, direction);
+    });
+  });
 
 /* ── Document checklist persistence ─────────────────────────── */
 
