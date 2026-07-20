@@ -12,6 +12,8 @@ Benefits Digger is a government-benefits screening platform that helps users ide
 - **What-If Lab** — compare hypothetical scenario changes without overwriting your session
 - **Program Explorer** — searchable catalog of all federal and state programs
 - **Source versioning** — tracks when official sources change and creates review tasks
+- **PDF export** — download the results page or planning dashboard as a PDF (html2pdf.js)
+- **Multi-language support (i18n)** — English and Spanish locales with a language selector in the nav
 - **Offline-capable** — seeds a local starter catalog so the app boots without network access
 - **Official links only** — all displayed sources and application paths point to `.gov` / `.mil` / `.us` domains
 
@@ -30,15 +32,19 @@ Benefits Digger is a government-benefits screening platform that helps users ide
 ```
 benefits-digger/
 ├── app/
-│   ├── main.py            # FastAPI app, routing, startup hooks
+│   ├── main.py             # FastAPI app, routing, startup hooks
 │   ├── config.py           # Settings via pydantic-settings
 │   ├── db.py               # SQLAlchemy engine & session
-│   ├── models.py           # 15 ORM models (programs, sessions, rules, sources, …)
+│   ├── models.py           # ORM models (programs, sessions, rules, sources, …)
 │   ├── schemas.py          # Pydantic request/response schemas
-│   ├── services.py         # Core business logic (~1100 lines)
+│   ├── services.py         # Core business logic
 │   ├── rules.py            # Eligibility rule evaluation
 │   ├── catalog.py          # USA.gov feed fetching & parsing
-│   ├── gemini.py           # Gemini AI integration for state programs
+│   ├── gemini.py           # Gemini-powered state program generation
+│   ├── llm.py              # Shared Gemini client & config helpers
+│   ├── intake_copilot.py   # Zobo conversational intake (life-event chat)
+│   ├── hybrid_explorer.py  # Keyword + LLM hybrid explorer search
+│   ├── gov_crawl.py        # Official .gov site crawling for sources
 │   ├── normalizers.py      # Answer normalization
 │   ├── seed_data.py        # Fallback bootstrap data
 │   └── static/             # Frontend assets
@@ -47,16 +53,21 @@ benefits-digger/
 │       ├── results.html    # Results display
 │       ├── whatif.html     # What-If Lab
 │       ├── explorer.html   # Program Explorer
-│       ├── shared.js       # Shared utilities & state
+│       ├── shared.js       # Shared utilities, state & i18n helper
 │       ├── home.js         # Home page logic
 │       ├── dashboard.js    # Dashboard logic
 │       ├── results-page.js # Results logic
 │       ├── whatif-page.js  # What-If Lab logic
 │       ├── explorer-page.js# Explorer logic
-│       └── styles.css      # Styles
+│       ├── styles.css      # Styles
+│       └── locales/        # Translation files (en.json, es.json)
+├── data/                   # Synthetic users & screening evaluation datasets
+├── docs/                   # PRD, technical spec, changelog
+├── scripts/                # Evaluation & synthetic-data generation scripts
 ├── tests/
 │   ├── test_api.py         # API endpoint tests
 │   └── test_rules.py       # Rule evaluation tests
+├── render.yaml             # Render deployment blueprint
 ├── requirements.txt
 └── README.md
 ```
@@ -65,7 +76,7 @@ benefits-digger/
 
 ```bash
 # Clone and set up
-git clone <repo-url>
+git clone https://github.com/dcsid/benefits-digger.git
 cd benefits-digger
 python3 -m venv .venv
 
@@ -189,8 +200,6 @@ The federal layer ingests the official USA.gov benefit-finder feed. The state la
 ### High Impact
 
 - **User accounts & saved sessions** — sessions are currently localStorage-only with no cross-device persistence
-- **PDF / print export** — let users save or share their benefits report as a document
-- **Multi-language support (i18n)** — many benefits-eligible users need non-English access
 - **Document checklist per program** — list what paperwork and documents to gather before applying
 - **Benefit amount estimator** — replace static amount text with calculations based on user inputs
 
